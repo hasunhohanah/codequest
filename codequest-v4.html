@@ -1,0 +1,1739 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CodeQuest – Apprenez à Coder</title>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged }
+    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+  import { getFirestore, doc, setDoc, getDoc, updateDoc, serverTimestamp }
+    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+  // ⚠️ REMPLACEZ PAR VOS VALEURS FIREBASE
+  const firebaseConfig = {
+    apiKey: "AIzaSyArQDayT8XWK7zK5o2dR9hBgVDrILy9oEk",
+    authDomain: "codequest-d714e.firebaseapp.com",
+    projectId: "codequest-d714e",
+    storageBucket: "codequest-d714e.firebasestorage.app",
+    messagingSenderId: "1088669691000",
+    appId: "1:1088669691000:web:71cf2755509f329711518d"
+  };
+
+  const app  = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db   = getFirestore(app);
+  window._fb = { auth, db, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, doc, setDoc, getDoc, updateDoc, serverTimestamp };
+
+  onAuthStateChanged(auth, async (fbUser) => {
+    if (fbUser) {
+      try {
+        const snap = await getDoc(doc(db, "users", fbUser.uid));
+        if (snap.exists()) {
+          window._user = { uid: fbUser.uid, ...snap.data() };
+          enterApp(window._user);
+        }
+      } catch(e) { enterApp({ uid: fbUser.uid, name:'Coder', email: fbUser.email, xp:0, level:1, xpPct:0, streak:0, lastDay:null, done:[], readChapters:[], totalAnswered:0, totalCorrect:0, perfectRuns:0 }); }
+    } else { showScreen('auth'); }
+  });
+</script>
+
+<style>
+:root{
+  --bg:#090b12;--s:#111320;--s2:#181b2e;--s3:#1f2340;--b:#272b4a;--b2:#343860;
+  --t:#f0f2ff;--m:#5a607a;--m2:#7b82a0;
+  --a:#5eead4;--a2:#818cf8;--a3:#fb7185;--a4:#fbbf24;--a5:#34d399;--a6:#f472b6;
+  --r:16px;--rs:10px;--rx:7px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;font-family:'Nunito',sans-serif;background:var(--bg);color:var(--t);overflow:hidden;}
+
+/* ── SCREENS ─────────────────────────────────── */
+.screen{display:none;width:100%;height:100vh;}
+.screen.active{display:flex;}
+
+/* ── LOADING ─────────────────────────────────── */
+#screen-loading{align-items:center;justify-content:center;flex-direction:column;gap:1.2rem;
+  background:radial-gradient(ellipse at 30% 40%,#1a1d4e44,transparent 60%),var(--bg);}
+.load-logo{font-family:'Fredoka One',cursive;font-size:3rem;color:var(--a);animation:glow 2s ease infinite;}
+@keyframes glow{0%,100%{text-shadow:0 0 10px var(--a)44;}50%{text-shadow:0 0 30px var(--a),0 0 60px var(--a2)66;}}
+.load-dots{display:flex;gap:8px;}
+.load-dots span{width:9px;height:9px;border-radius:50%;background:var(--a2);animation:dot 1.2s ease infinite;}
+.load-dots span:nth-child(2){animation-delay:.2s;background:var(--a);}
+.load-dots span:nth-child(3){animation-delay:.4s;background:var(--a4);}
+@keyframes dot{0%,100%{transform:scale(1);opacity:.3;}50%{transform:scale(1.5);opacity:1;}}
+
+/* ── AUTH ────────────────────────────────────── */
+#screen-auth{
+  background:radial-gradient(ellipse at 15% 50%,#1a1d5e55,transparent 55%),
+             radial-gradient(ellipse at 85% 20%,#0e2a1e55,transparent 50%),var(--bg);
+  align-items:center;justify-content:center;flex-direction:column;gap:2rem;overflow:hidden;position:relative;}
+.auth-bg{position:absolute;inset:0;pointer-events:none;}
+.auth-orb{position:absolute;border-radius:50%;filter:blur(80px);animation:drift ease-in-out infinite;}
+@keyframes drift{0%,100%{transform:translate(0,0);}50%{transform:translate(30px,-20px);}}
+.auth-logo-wrap{text-align:center;z-index:1;}
+.auth-logo{font-family:'Fredoka One',cursive;font-size:3.5rem;background:linear-gradient(135deg,var(--a),var(--a2),var(--a6));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.auth-tagline{color:var(--m2);font-size:.9rem;margin-top:.3rem;font-weight:700;letter-spacing:.03em;}
+.auth-card{background:var(--s);border:1px solid var(--b);border-radius:var(--r);padding:2rem;width:100%;max-width:420px;box-shadow:0 30px 80px #00000070;z-index:1;backdrop-filter:blur(10px);}
+.a-tabs{display:flex;gap:.4rem;margin-bottom:1.5rem;background:var(--s2);border-radius:var(--rs);padding:4px;}
+.a-tab{flex:1;padding:.55rem;border:none;border-radius:var(--rx);background:transparent;color:var(--m);font-family:'Nunito',sans-serif;font-weight:800;font-size:.88rem;cursor:pointer;transition:all .2s;}
+.a-tab.active{background:var(--s3);color:var(--t);}
+.fld{margin-bottom:.9rem;}
+.fld label{display:block;font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--m);margin-bottom:.35rem;}
+.fld input{width:100%;background:var(--s2);border:1px solid var(--b);border-radius:var(--rx);padding:.7rem 1rem;color:var(--t);font-family:'Nunito',sans-serif;font-size:.92rem;font-weight:600;transition:border-color .2s;}
+.fld input:focus{outline:none;border-color:var(--a2);}
+.fld input::placeholder{color:var(--m);}
+.ava-row{display:grid;grid-template-columns:repeat(6,1fr);gap:.4rem;margin-bottom:.9rem;}
+.ava-o{height:44px;border-radius:50%;background:var(--s2);border:2px solid var(--b);display:flex;align-items:center;justify-content:center;font-size:1.3rem;cursor:pointer;transition:all .2s;}
+.ava-o:hover{border-color:var(--a2);}
+.ava-o.sel{border-color:var(--a);background:var(--s3);}
+.a-btn{width:100%;padding:.88rem;border:none;border-radius:var(--rs);background:linear-gradient(135deg,var(--a2),#6366f1);color:white;font-family:'Nunito',sans-serif;font-size:.98rem;font-weight:800;cursor:pointer;transition:all .2s;margin-top:.4rem;}
+.a-btn:hover{opacity:.86;transform:translateY(-2px);}
+.a-btn:disabled{opacity:.45;cursor:not-allowed;transform:none;}
+.a-msg{border-radius:var(--rx);padding:.65rem 1rem;font-size:.83rem;font-weight:700;margin-bottom:.9rem;display:none;}
+.a-msg.show{display:block;}
+.a-msg.err{background:#fb718520;border:1px solid #fb718540;color:var(--a3);}
+.a-msg.ok{background:#5eead420;border:1px solid #5eead440;color:var(--a);}
+
+/* ── APP ─────────────────────────────────────── */
+#screen-app{flex-direction:row;}
+
+/* SIDEBAR */
+.sidebar{width:80px;background:var(--s);border-right:1px solid var(--b);display:flex;flex-direction:column;align-items:center;padding:1.2rem 0;gap:.25rem;flex-shrink:0;}
+.sb-logo{font-family:'Fredoka One',cursive;font-size:1.5rem;color:var(--a);margin-bottom:1.1rem;filter:drop-shadow(0 0 8px var(--a)55);}
+.nb{width:54px;height:54px;border-radius:13px;border:2px solid transparent;background:transparent;color:var(--m);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;transition:all .2s;}
+.nb:hover{background:var(--s2);color:var(--t);}
+.nb.active{background:var(--s2);color:var(--a);border-color:var(--a)33;}
+.nb .ni{font-size:1.25rem;}.nb .nl{font-size:.55rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em;}
+.sb-sep{width:38px;height:1px;background:var(--b);margin:.4rem 0;}
+.sb-bot{margin-top:auto;display:flex;flex-direction:column;align-items:center;gap:.4rem;}
+.sb-ava{width:44px;height:44px;border-radius:50%;background:var(--s2);border:2px solid var(--b);display:flex;align-items:center;justify-content:center;font-size:1.35rem;cursor:pointer;transition:all .2s;}
+.sb-ava:hover{border-color:var(--a);}
+.sb-logout{width:34px;height:34px;border-radius:9px;border:none;background:transparent;color:var(--m);font-size:.95rem;cursor:pointer;transition:all .2s;font-family:'Nunito',sans-serif;}
+.sb-logout:hover{background:#fb718520;color:var(--a3);}
+
+/* MAIN */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+
+/* TOPBAR */
+.topbar{display:flex;align-items:center;gap:.9rem;padding:.8rem 1.5rem;background:var(--s);border-bottom:1px solid var(--b);flex-shrink:0;}
+.tb-title{font-family:'Fredoka One',cursive;font-size:1.15rem;color:var(--a);flex:1;}
+.chip{display:flex;align-items:center;gap:.45rem;background:var(--s2);border:1px solid var(--b);border-radius:999px;padding:.3rem .85rem;font-size:.8rem;font-weight:800;white-space:nowrap;}
+.chip.xp{color:var(--a4);}.chip.str{color:#fb923c;}.chip.cloud{color:var(--a);}
+.xp-wrap{display:flex;flex-direction:column;gap:2px;min-width:110px;}
+.xp-lbl{font-size:.65rem;font-weight:800;color:var(--m);letter-spacing:.04em;}
+.xp-track{background:var(--s2);border-radius:999px;height:6px;border:1px solid var(--b);}
+.xp-fill{background:linear-gradient(90deg,var(--a),var(--a2));height:100%;border-radius:999px;transition:width .7s cubic-bezier(.34,1.56,.64,1);}
+
+/* CONTENT */
+.content{flex:1;overflow-y:auto;padding:1.6rem;}
+.content::-webkit-scrollbar{width:4px;}
+.content::-webkit-scrollbar-thumb{background:var(--b);border-radius:2px;}
+
+/* VIEWS */
+.view{display:none;}
+.view.active{display:block;animation:fadeUp .3s ease;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
+
+/* ── HOME ────────────────────────────────────── */
+.hero{margin-bottom:1.6rem;}
+.hero h1{font-family:'Fredoka One',cursive;font-size:1.9rem;line-height:1.2;}
+.hero h1 em{font-style:normal;background:linear-gradient(90deg,var(--a),var(--a2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.hero p{color:var(--m2);margin-top:.3rem;font-size:.87rem;}
+.daily{background:linear-gradient(135deg,#151840,#1a2810);border:1px solid var(--b);border-radius:var(--r);padding:1.2rem 1.4rem;display:flex;align-items:center;gap:1.1rem;margin-bottom:1.6rem;cursor:pointer;transition:all .2s;overflow:hidden;position:relative;}
+.daily::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,#ffffff04,transparent);animation:shim 3s infinite;}
+@keyframes shim{from{transform:translateX(-100%);}to{transform:translateX(100%);}}
+.daily:hover{border-color:var(--a2);transform:translateY(-2px);}
+.daily-ico{font-size:2.6rem;flex-shrink:0;}
+.daily-txt h3{font-weight:800;font-size:1rem;margin-bottom:.2rem;}
+.daily-txt p{font-size:.8rem;color:var(--m2);}
+.daily-cta{margin-left:auto;background:var(--a4);color:#000;border:none;border-radius:999px;padding:.55rem 1.3rem;font-family:'Nunito',sans-serif;font-weight:800;font-size:.82rem;cursor:pointer;flex-shrink:0;}
+.sec-h{font-size:.7rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--m);margin-bottom:.9rem;}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:.9rem;margin-bottom:1.8rem;}
+.cc{background:var(--s);border:2px solid var(--b);border-radius:var(--r);padding:1.2rem;cursor:pointer;transition:all .25s;position:relative;overflow:hidden;}
+.cc::before{content:'';position:absolute;inset:0;background:var(--cc);opacity:0;transition:opacity .25s;}
+.cc:hover{border-color:var(--cc);transform:translateY(-3px);box-shadow:0 8px 25px #00000050;}
+.cc:hover::before{opacity:.07;}
+.cc-bdg{position:absolute;top:.8rem;right:.8rem;background:var(--cc);color:#000;font-size:.6rem;font-weight:800;padding:.12rem .45rem;border-radius:999px;}
+.cc-ico{font-size:1.9rem;margin-bottom:.6rem;}
+.cc-nm{font-weight:800;font-size:.92rem;margin-bottom:.2rem;}
+.cc-ds{font-size:.73rem;color:var(--m2);line-height:1.5;margin-bottom:.8rem;}
+.cc-pg{background:var(--s2);border-radius:999px;height:4px;}
+.cc-pgf{height:100%;border-radius:999px;background:var(--cc);}
+.cc-mt{display:flex;justify-content:space-between;margin-top:.4rem;font-size:.68rem;color:var(--m);font-weight:700;}
+
+/* ── LESSON LIST ─────────────────────────────── */
+.lesson-bar{display:flex;align-items:center;gap:.9rem;margin-bottom:1.4rem;}
+.back-btn{background:var(--s2);border:1px solid var(--b);color:var(--t);padding:.45rem .9rem;border-radius:var(--rx);font-size:.8rem;font-weight:700;cursor:pointer;font-family:'Nunito',sans-serif;transition:all .2s;}
+.back-btn:hover{border-color:var(--a);color:var(--a);}
+.lesson-meta h2{font-size:1.2rem;font-weight:900;}
+.lesson-meta p{color:var(--m2);font-size:.8rem;}
+.units{display:flex;flex-direction:column;gap:.7rem;}
+.unit-row{background:var(--s);border:2px solid var(--b);border-radius:var(--r);padding:1rem 1.2rem;display:flex;align-items:center;gap:.9rem;cursor:pointer;transition:all .2s;}
+.unit-row:hover:not(.locked){border-color:var(--uc);transform:translateX(4px);}
+.unit-row.done{border-color:var(--a)55;background:#5eead40a;}
+.unit-row.locked{opacity:.35;cursor:not-allowed;}
+.u-ico{width:44px;height:44px;border-radius:11px;background:var(--s2);display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0;border:2px solid var(--uc,#5eead4)30;}
+.unit-row.done .u-ico{border-color:var(--a);background:#5eead410;}
+.u-txt{flex:1;}
+.u-txt h3{font-weight:800;font-size:.88rem;margin-bottom:.12rem;}
+.u-txt p{font-size:.73rem;color:var(--m2);}
+.u-modes{display:flex;gap:.4rem;align-items:center;}
+.u-mode-badge{font-size:.65rem;font-weight:800;padding:.15rem .5rem;border-radius:999px;border:1px solid;}
+.u-mode-badge.theory{background:#818cf820;border-color:#818cf840;color:var(--a2);}
+.u-mode-badge.quiz{background:#5eead420;border-color:#5eead440;color:var(--a);}
+.u-mode-badge.code{background:#fbbf2420;border-color:#fbbf2440;color:var(--a4);}
+.u-xp{background:var(--s2);border:1px solid var(--b);border-radius:999px;padding:.18rem .65rem;font-size:.7rem;font-weight:800;color:var(--a4);white-space:nowrap;}
+
+/* ── UNIT DETAIL (mode selector) ─────────────── */
+.unit-detail-header{display:flex;align-items:center;gap:.9rem;margin-bottom:1.4rem;}
+.unit-modes-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;max-width:680px;margin:0 auto 2rem;}
+.mode-card{background:var(--s);border:2px solid var(--b);border-radius:var(--r);padding:1.8rem 1.2rem;text-align:center;cursor:pointer;transition:all .25s;}
+.mode-card:hover{transform:translateY(-4px);box-shadow:0 10px 30px #00000040;}
+.mode-card.theory-c:hover{border-color:var(--a2);}
+.mode-card.quiz-c:hover{border-color:var(--a);}
+.mode-card.code-c:hover{border-color:var(--a4);}
+.mode-card .mc-ico{font-size:2.5rem;margin-bottom:.8rem;}
+.mode-card h3{font-weight:800;font-size:1rem;margin-bottom:.4rem;}
+.mode-card p{font-size:.78rem;color:var(--m2);line-height:1.5;}
+.mode-card .mc-pill{display:inline-block;margin-top:.8rem;padding:.25rem .7rem;border-radius:999px;font-size:.7rem;font-weight:800;}
+.theory-c .mc-pill{background:#818cf820;color:var(--a2);border:1px solid #818cf840;}
+.quiz-c .mc-pill{background:#5eead420;color:var(--a);border:1px solid #5eead440;}
+.code-c .mc-pill{background:#fbbf2420;color:var(--a4);border:1px solid #fbbf2440;}
+
+/* ── THEORY VIEW ─────────────────────────────── */
+.theory-shell{max-width:760px;margin:0 auto;}
+.theory-topbar{display:flex;align-items:center;gap:1rem;margin-bottom:1.4rem;}
+.chapter-prog{flex:1;}
+.ch-prog-label{font-size:.7rem;font-weight:800;color:var(--m);margin-bottom:.3rem;}
+.ch-prog-dots{display:flex;gap:.4rem;}
+.ch-dot{width:28px;height:6px;border-radius:999px;background:var(--b);transition:all .3s;}
+.ch-dot.done{background:var(--a2);}
+.ch-dot.active{background:var(--a);width:40px;}
+
+.theory-card{background:var(--s);border:1px solid var(--b);border-radius:var(--r);padding:1.8rem;margin-bottom:1rem;animation:fadeUp .3s ease;}
+.theory-card .ch-badge{display:inline-flex;align-items:center;gap:.4rem;background:var(--s2);border:1px solid var(--b);border-radius:999px;padding:.22rem .75rem;font-size:.68rem;font-weight:800;color:var(--m2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:1rem;}
+.theory-card h2{font-size:1.2rem;font-weight:900;margin-bottom:.8rem;color:var(--t);}
+.theory-card .lead{font-size:.92rem;color:var(--m2);line-height:1.8;margin-bottom:1.2rem;}
+.theory-card h3{font-size:.88rem;font-weight:800;color:var(--a2);margin:1.2rem 0 .5rem;}
+.theory-card p{font-size:.87rem;color:#c4c9e8;line-height:1.8;margin-bottom:.8rem;}
+.theory-card ul,.theory-card ol{padding-left:1.3rem;margin-bottom:.8rem;}
+.theory-card li{font-size:.87rem;color:#c4c9e8;line-height:1.8;margin-bottom:.2rem;}
+.theory-card .note{background:#818cf815;border-left:3px solid var(--a2);border-radius:0 var(--rx) var(--rx) 0;padding:.8rem 1rem;margin:.8rem 0;font-size:.83rem;color:#a5b4fc;}
+.theory-card .tip{background:#5eead415;border-left:3px solid var(--a);border-radius:0 var(--rx) var(--rx) 0;padding:.8rem 1rem;margin:.8rem 0;font-size:.83rem;color:var(--a);}
+.theory-card .warn{background:#fbbf2415;border-left:3px solid var(--a4);border-radius:0 var(--rx) var(--rx) 0;padding:.8rem 1rem;margin:.8rem 0;font-size:.83rem;color:var(--a4);}
+
+/* Code blocks in theory */
+.codeblock{background:#070910;border:1px solid var(--b);border-left:3px solid var(--a2);border-radius:var(--rx);padding:.9rem 1.1rem;margin:.8rem 0;position:relative;font-family:'JetBrains Mono',monospace;font-size:.8rem;line-height:1.85;overflow-x:auto;color:#c9d1d9;}
+.codeblock .cb-lang{position:absolute;top:.5rem;right:2.8rem;font-size:.6rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--m);font-family:'Nunito',sans-serif;}
+.copy-btn{position:absolute;top:.45rem;right:.5rem;background:var(--s2);border:1px solid var(--b);color:var(--m);padding:.18rem .55rem;border-radius:5px;cursor:pointer;font-size:.68rem;font-weight:800;transition:all .2s;font-family:'Nunito',sans-serif;}
+.copy-btn:hover{background:var(--b);color:var(--t);}
+.copy-btn.cp{background:var(--a);color:#000;border-color:var(--a);}
+/* Syntax */
+.kw{color:#c084fc;}.fn{color:#7dd3fc;}.str{color:#86efac;}.cm{color:#374151;font-style:italic;}.num{color:#fb923c;}.op{color:#f472b6;}.cls{color:#fde68a;}.mc{color:#6ade80;}.wc{color:#c79a3e;}.at{color:#38bdf8;}
+
+.theory-nav{display:flex;gap:.8rem;margin-top:1.2rem;}
+.t-btn{flex:1;padding:.8rem;border:none;border-radius:var(--rs);font-family:'Nunito',sans-serif;font-size:.92rem;font-weight:800;cursor:pointer;transition:all .2s;}
+.t-btn.prev{background:var(--s2);color:var(--m2);border:1px solid var(--b);}
+.t-btn.prev:hover{border-color:var(--a2);color:var(--a2);}
+.t-btn.next{background:linear-gradient(135deg,var(--a2),#6366f1);color:white;}
+.t-btn.next:hover{opacity:.85;transform:translateY(-2px);}
+.t-btn.finish{background:linear-gradient(135deg,var(--a),var(--a5));color:#000;}
+
+/* End-of-theory mini quiz prompt */
+.theory-complete{background:linear-gradient(135deg,var(--s2),var(--s3));border:2px solid var(--a);border-radius:var(--r);padding:2rem;text-align:center;animation:fadeUp .4s ease;}
+.tc-icon{font-size:3.5rem;margin-bottom:.8rem;}
+.tc-title{font-family:'Fredoka One',cursive;font-size:1.6rem;color:var(--a);margin-bottom:.5rem;}
+.tc-sub{color:var(--m2);font-size:.88rem;margin-bottom:1.5rem;line-height:1.6;}
+.tc-btns{display:flex;gap:.8rem;justify-content:center;flex-wrap:wrap;}
+.tc-btn{padding:.75rem 1.8rem;border:none;border-radius:var(--rs);font-family:'Nunito',sans-serif;font-weight:800;font-size:.9rem;cursor:pointer;transition:all .2s;}
+.tc-btn.quiz-go{background:linear-gradient(135deg,var(--a),var(--a5));color:#000;}
+.tc-btn.back-home{background:var(--s2);color:var(--t);border:1px solid var(--b);}
+.tc-btn:hover{opacity:.85;transform:translateY(-2px);}
+
+/* ── CODE SANDBOX ────────────────────────────── */
+.sandbox-shell{max-width:860px;margin:0 auto;}
+.sandbox-header{display:flex;align-items:center;gap:.9rem;margin-bottom:1.2rem;}
+.sandbox-body{display:grid;grid-template-columns:1fr 1fr;gap:1rem;height:420px;}
+.sandbox-panel{background:var(--s);border:1px solid var(--b);border-radius:var(--r);display:flex;flex-direction:column;overflow:hidden;}
+.sp-header{display:flex;align-items:center;justify-content:space-between;padding:.6rem 1rem;background:var(--s2);border-bottom:1px solid var(--b);flex-shrink:0;}
+.sp-title{font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--m);}
+.sp-actions{display:flex;gap:.4rem;}
+.sp-btn{background:var(--s3);border:1px solid var(--b);color:var(--m2);padding:.25rem .7rem;border-radius:5px;cursor:pointer;font-size:.72rem;font-weight:800;font-family:'Nunito',sans-serif;transition:all .2s;}
+.sp-btn:hover{background:var(--b);color:var(--t);}
+.sp-btn.run{background:var(--a);color:#000;border-color:var(--a);}
+.sp-btn.run:hover{opacity:.85;}
+.sp-btn.reset{background:#fb718520;border-color:#fb718540;color:var(--a3);}
+.code-editor{flex:1;background:#060810;border:none;outline:none;padding:1rem;font-family:'JetBrains Mono',monospace;font-size:.8rem;color:#e2e8f0;resize:none;line-height:1.8;}
+.output-area{flex:1;padding:1rem;font-family:'JetBrains Mono',monospace;font-size:.8rem;line-height:1.8;overflow-y:auto;color:#c9d1d9;}
+.output-area .out-line{margin-bottom:.1rem;}
+.output-area .out-err{color:var(--a3);}
+.output-area .out-ok{color:var(--a);}
+.output-area .out-info{color:var(--m2);font-style:italic;}
+.sandbox-exercises{margin-top:1rem;}
+.ex-title{font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--m);margin-bottom:.6rem;}
+.ex-list{display:flex;gap:.5rem;flex-wrap:wrap;}
+.ex-btn{background:var(--s);border:1px solid var(--b);border-radius:var(--rx);padding:.4rem .85rem;font-size:.78rem;font-weight:700;cursor:pointer;color:var(--m2);transition:all .2s;font-family:'Nunito',sans-serif;}
+.ex-btn:hover{border-color:var(--a4);color:var(--a4);}
+.ex-btn.active{background:var(--a4)20;border-color:var(--a4);color:var(--a4);}
+
+/* ── QUIZ ────────────────────────────────────── */
+.quiz-shell{max-width:680px;margin:0 auto;}
+.quiz-topbar{display:flex;align-items:center;gap:.9rem;margin-bottom:1.3rem;}
+.q-prog-wrap{flex:1;}
+.q-prog-track{background:var(--s2);border-radius:999px;height:9px;border:1px solid var(--b);}
+.q-prog-fill{background:linear-gradient(90deg,var(--a),var(--a2));height:100%;border-radius:999px;transition:width .5s ease;}
+.q-counter{font-size:.78rem;font-weight:800;color:var(--m);white-space:nowrap;}
+.inf-badge{background:#5eead420;border:1px solid #5eead440;color:var(--a);border-radius:999px;padding:.28rem .75rem;font-size:.72rem;font-weight:800;}
+.quiz-card{background:var(--s);border:2px solid var(--b);border-radius:var(--r);padding:1.8rem;}
+.q-pill{display:inline-flex;align-items:center;gap:.4rem;background:var(--s2);border:1px solid var(--b);border-radius:999px;padding:.22rem .75rem;font-size:.68rem;font-weight:800;color:var(--m2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:1rem;}
+.q-txt{font-size:1.05rem;font-weight:800;line-height:1.5;margin-bottom:.7rem;}
+.q-code{background:#060810;border:1px solid var(--b);border-left:3px solid var(--a2);border-radius:var(--rx);padding:.9rem 1.1rem;font-family:'JetBrains Mono',monospace;font-size:.78rem;line-height:1.85;margin-bottom:1.3rem;overflow-x:auto;color:#c9d1d9;}
+.opts{display:grid;grid-template-columns:1fr 1fr;gap:.7rem;margin-bottom:1.2rem;}
+.opt{background:var(--s2);border:2px solid var(--b);border-radius:var(--rs);padding:.85rem .9rem;color:var(--t);font-family:'Nunito',sans-serif;font-size:.86rem;font-weight:700;cursor:pointer;transition:all .2s;text-align:left;display:flex;align-items:center;gap:.65rem;}
+.opt:hover:not(:disabled){border-color:var(--a2);background:#818cf810;}
+.opt.sel{border-color:var(--a2);background:#818cf818;}
+.opt.ok{border-color:var(--a)!important;background:#5eead418!important;color:var(--a);}
+.opt.bad{border-color:var(--a3)!important;background:#fb718518!important;color:var(--a3);}
+.opt-k{width:26px;height:26px;background:var(--s);border:1px solid var(--b);border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:800;color:var(--m);flex-shrink:0;}
+.opt.ok .opt-k{background:var(--a);color:#000;border-color:var(--a);}
+.opt.bad .opt-k{background:var(--a3);color:#fff;border-color:var(--a3);}
+.fill-inp{background:var(--s2);border:2px solid var(--a2);border-radius:var(--rx);color:var(--a2);font-family:'JetBrains Mono',monospace;font-size:.92rem;font-weight:700;padding:.5rem 1rem;width:200px;text-align:center;outline:none;transition:all .2s;margin-bottom:1.2rem;}
+.fill-inp:focus{border-color:var(--a);box-shadow:0 0 0 3px #5eead420;}
+.fill-inp.ok{border-color:var(--a);color:var(--a);}
+.fill-inp.bad{border-color:var(--a3);color:var(--a3);}
+.feedback{border-radius:var(--rs);padding:.9rem 1.1rem;margin-bottom:1.1rem;display:none;gap:.75rem;align-items:flex-start;}
+.feedback.show{display:flex;}
+.feedback.ok{background:#5eead415;border:1px solid #5eead430;color:var(--a);}
+.feedback.bad{background:#fb718515;border:1px solid #fb718530;color:var(--a3);}
+.fb-ico{font-size:1.2rem;flex-shrink:0;}
+.fb-body strong{display:block;margin-bottom:.15rem;font-size:.88rem;}
+.fb-body span{font-size:.78rem;opacity:.8;}
+.quiz-acts{display:flex;gap:.7rem;}
+.q-btn{flex:1;padding:.82rem;border:none;border-radius:var(--rs);font-family:'Nunito',sans-serif;font-size:.92rem;font-weight:800;cursor:pointer;transition:all .2s;}
+.q-btn.primary{background:linear-gradient(135deg,var(--a2),#6366f1);color:white;}
+.q-btn.success{background:linear-gradient(135deg,var(--a),var(--a5));color:#000;}
+.q-btn.skip{background:var(--s2);color:var(--m);border:1px solid var(--b);flex:0 0 auto;padding:.82rem 1.1rem;}
+.q-btn:hover:not(:disabled){opacity:.85;transform:translateY(-2px);}
+.q-btn:disabled{opacity:.3;cursor:default;transform:none;}
+
+/* RESULTS */
+.results-wrap{max-width:500px;margin:2rem auto;text-align:center;}
+.res-trophy{font-size:5rem;display:block;animation:pop .5s cubic-bezier(.34,1.56,.64,1);margin-bottom:.9rem;}
+@keyframes pop{from{transform:scale(0);}to{transform:scale(1);}}
+.res-title{font-family:'Fredoka One',cursive;font-size:1.9rem;margin-bottom:.4rem;}
+.res-sub{color:var(--m2);margin-bottom:1.6rem;font-size:.88rem;}
+.res-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.9rem;margin-bottom:1.6rem;}
+.r-stat{background:var(--s);border:1px solid var(--b);border-radius:var(--rs);padding:1.1rem;}
+.r-stat .rv{font-size:1.7rem;font-weight:900;}.r-stat .rl{font-size:.65rem;color:var(--m);font-weight:800;text-transform:uppercase;margin-top:.2rem;}
+.res-btns{display:flex;flex-direction:column;gap:.7rem;}
+.r-btn{padding:.82rem;border:none;border-radius:var(--rs);font-family:'Nunito',sans-serif;font-weight:800;font-size:.92rem;cursor:pointer;transition:all .2s;}
+.r-btn.main{background:linear-gradient(135deg,var(--a2),#6366f1);color:white;}
+.r-btn.sec{background:var(--s2);color:var(--t);border:1px solid var(--b);}
+.r-btn:hover{opacity:.85;transform:translateY(-1px);}
+
+/* LEADERBOARD */
+.lb-h{display:flex;align-items:center;gap:.9rem;margin-bottom:1.4rem;}
+.lb-h h1{font-family:'Fredoka One',cursive;font-size:1.7rem;}
+.lb-badge{font-size:.75rem;color:var(--m2);font-weight:700;background:var(--s2);border:1px solid var(--b);border-radius:999px;padding:.28rem .75rem;}
+.lb-rows{display:flex;flex-direction:column;gap:.55rem;}
+.lb-r{background:var(--s);border:1px solid var(--b);border-radius:var(--rs);padding:.9rem 1.1rem;display:flex;align-items:center;gap:.85rem;transition:all .2s;}
+.lb-r:hover{transform:translateX(4px);}
+.lb-r.me{border-color:var(--a);background:#5eead40a;}
+.lb-rank{font-size:1rem;font-weight:900;width:28px;text-align:center;flex-shrink:0;}
+.lb-ava{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;}
+.lb-inf{flex:1;}
+.lb-nm{font-weight:800;font-size:.88rem;}
+.lb-sb{font-size:.7rem;color:var(--m2);margin-top:1px;}
+.lb-xp{font-weight:900;color:var(--a4);font-size:.85rem;}
+
+/* PROFILE */
+.p-top{background:linear-gradient(135deg,var(--s2),var(--s));border:1px solid var(--b);border-radius:var(--r);padding:1.6rem;margin-bottom:1.2rem;display:flex;align-items:center;gap:1.4rem;}
+.p-ava{width:84px;height:84px;border-radius:50%;background:var(--s3);display:flex;align-items:center;justify-content:center;font-size:2.4rem;border:3px solid var(--a);box-shadow:0 0 20px var(--a)44;flex-shrink:0;}
+.p-inf h2{font-size:1.3rem;font-weight:900;}
+.p-email{font-size:.78rem;color:var(--m2);margin-top:.15rem;}
+.p-cloud{display:inline-flex;align-items:center;gap:.4rem;margin-top:.5rem;background:#5eead420;border:1px solid #5eead440;color:var(--a);border-radius:999px;padding:.22rem .65rem;font-size:.7rem;font-weight:800;}
+.p-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:.7rem;margin-bottom:1.2rem;}
+.ps{background:var(--s);border:1px solid var(--b);border-radius:var(--rs);padding:.9rem;text-align:center;}
+.ps .pv{font-size:1.45rem;font-weight:900;}.ps .pl{font-size:.65rem;color:var(--m);font-weight:800;text-transform:uppercase;margin-top:.2rem;}
+.ach-g{display:grid;grid-template-columns:repeat(auto-fill,minmax(125px,1fr));gap:.7rem;}
+.ach-c{background:var(--s);border:2px solid var(--b);border-radius:var(--rs);padding:.9rem;text-align:center;transition:all .2s;}
+.ach-c.unlocked{border-color:var(--a4);background:#fbbf2408;}
+.ach-c:hover{transform:translateY(-2px);}
+.ach-ico{font-size:1.7rem;margin-bottom:.35rem;}
+.ach-nm{font-size:.73rem;font-weight:800;margin-bottom:.12rem;}
+.ach-ds{font-size:.65rem;color:var(--m);}
+
+/* TOAST */
+.toast{position:fixed;bottom:1.4rem;right:1.4rem;z-index:9999;padding:.75rem 1.3rem;border-radius:999px;font-weight:800;font-size:.88rem;transform:translateY(80px);opacity:0;pointer-events:none;transition:all .4s cubic-bezier(.34,1.56,.64,1);}
+.toast.show{transform:translateY(0);opacity:1;}
+.toast.xp{background:var(--a4);color:#000;}
+.toast.info{background:var(--a2);color:white;}
+.toast.err{background:var(--a3);color:white;}
+.toast.cloud{background:var(--a);color:#000;}
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div class="screen active" id="screen-loading">
+  <div class="load-logo">⚡ CodeQuest</div>
+  <div style="color:var(--m2);font-size:.88rem;font-weight:700;">Connexion Firebase…</div>
+  <div class="load-dots"><span></span><span></span><span></span></div>
+</div>
+
+<!-- AUTH -->
+<div class="screen" id="screen-auth">
+  <div class="auth-bg">
+    <div class="auth-orb" style="width:400px;height:400px;background:#4f46e520;left:-100px;top:10%;animation-duration:8s;"></div>
+    <div class="auth-orb" style="width:300px;height:300px;background:#5eead415;right:-50px;bottom:15%;animation-duration:11s;animation-delay:-4s;"></div>
+  </div>
+  <div class="auth-logo-wrap">
+    <div class="auth-logo">⚡ CodeQuest</div>
+    <div class="auth-tagline">Apprenez à coder · Cours complets · Progression cloud ☁️</div>
+  </div>
+  <div class="auth-card">
+    <div class="a-tabs">
+      <button class="a-tab active" onclick="switchTab('login')">Connexion</button>
+      <button class="a-tab" onclick="switchTab('register')">Créer un compte</button>
+    </div>
+    <div class="a-msg" id="a-msg"></div>
+    <div id="tab-login">
+      <div class="fld"><label>Adresse e-mail</label><input id="l-email" type="email" placeholder="vous@exemple.com"></div>
+      <div class="fld"><label>Mot de passe</label><input id="l-pwd" type="password" placeholder="••••••••"></div>
+      <button class="a-btn" id="login-btn" onclick="doLogin()">Se connecter →</button>
+    </div>
+    <div id="tab-register" style="display:none">
+      <div class="fld"><label>Pseudo</label><input id="r-name" type="text" placeholder="CoolCoder42"></div>
+      <div class="fld"><label>Adresse e-mail</label><input id="r-email" type="email" placeholder="vous@exemple.com"></div>
+      <div class="fld"><label>Mot de passe (min. 6 caractères)</label><input id="r-pwd" type="password" placeholder="••••••••"></div>
+      <div class="fld"><label>Avatar</label><div class="ava-row" id="ava-grid"></div></div>
+      <button class="a-btn" id="reg-btn" onclick="doRegister()">Créer mon compte 🚀</button>
+    </div>
+  </div>
+</div>
+
+<!-- APP -->
+<div class="screen" id="screen-app">
+  <div class="sidebar">
+    <div class="sb-logo">⚡</div>
+    <button class="nb active" id="nb-home" onclick="showView('home')"><span class="ni">🏠</span><span class="nl">Accueil</span></button>
+    <button class="nb" id="nb-lb" onclick="showView('lb')"><span class="ni">🏆</span><span class="nl">Top</span></button>
+    <button class="nb" id="nb-profile" onclick="showView('profile')"><span class="ni">👤</span><span class="nl">Profil</span></button>
+    <div class="sb-sep"></div>
+    <div class="sb-bot">
+      <div class="sb-ava" id="sb-ava" onclick="showView('profile')">🧑</div>
+      <button class="sb-logout" onclick="doLogout()" title="Déconnexion">⏻</button>
+    </div>
+  </div>
+  <div class="main">
+    <div class="topbar">
+      <div class="tb-title">CodeQuest</div>
+      <div class="chip cloud">☁️ Sauvegarde active</div>
+      <div class="xp-wrap">
+        <div class="xp-lbl">Niveau <span id="tb-lvl">1</span></div>
+        <div class="xp-track"><div class="xp-fill" id="tb-xpf" style="width:0%"></div></div>
+      </div>
+      <div class="chip xp">⚡ <span id="tb-xp">0</span></div>
+      <div class="chip str">🔥 <span id="tb-str">0</span></div>
+    </div>
+    <div class="content">
+
+      <!-- HOME -->
+      <div class="view active" id="view-home">
+        <div class="hero">
+          <h1>Prêt à apprendre,<br><em id="hero-name">Coder</em> ?</h1>
+          <p>📖 Cours complets · 🎯 Quiz variés · 💻 Sandbox de code · ♾️ Sans limite</p>
+        </div>
+        <div class="daily" onclick="startQuiz('daily')">
+          <div class="daily-ico">⚡</div>
+          <div class="daily-txt"><h3>Défi du Jour</h3><p>Mix de langages · 5 questions · Double XP</p></div>
+          <button class="daily-cta">Lancer →</button>
+        </div>
+        <div class="sec-h">Tous les Parcours</div>
+        <div class="grid" id="courses-grid"></div>
+      </div>
+
+      <!-- LESSON LIST -->
+      <div class="view" id="view-lessons">
+        <div class="lesson-bar">
+          <button class="back-btn" onclick="showView('home')">← Retour</button>
+          <div class="lesson-meta"><h2 id="lesson-title">Cours</h2><p id="lesson-sub"></p></div>
+        </div>
+        <div class="units" id="units-list"></div>
+      </div>
+
+      <!-- UNIT DETAIL (choose mode) -->
+      <div class="view" id="view-unit">
+        <div class="unit-detail-header">
+          <button class="back-btn" onclick="showView('lessons')">← Retour</button>
+          <div class="lesson-meta"><h2 id="unit-title">Leçon</h2><p id="unit-sub"></p></div>
+        </div>
+        <div class="unit-modes-grid">
+          <div class="mode-card theory-c" onclick="startTheory()">
+            <div class="mc-ico">📖</div>
+            <h3>Cours Théorique</h3>
+            <p>Apprenez les concepts avec des explications claires et des exemples de code annotés</p>
+            <div class="mc-pill">Recommandé en premier</div>
+          </div>
+          <div class="mode-card code-c" onclick="startSandbox()">
+            <div class="mc-ico">💻</div>
+            <h3>Sandbox de Code</h3>
+            <p>Pratiquez en écrivant et en exécutant votre propre code avec des exercices guidés</p>
+            <div class="mc-pill">Exercices pratiques</div>
+          </div>
+          <div class="mode-card quiz-c" id="quiz-mode-card" onclick="startQuiz(null)">
+            <div class="mc-ico">🎯</div>
+            <h3>Quiz</h3>
+            <p>Testez vos connaissances avec des questions variées — jamais les mêmes deux fois</p>
+            <div class="mc-pill" id="quiz-lock-pill">Lisez le cours d'abord</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- THEORY -->
+      <div class="view" id="view-theory">
+        <div class="theory-shell">
+          <div class="theory-topbar">
+            <button class="back-btn" onclick="showView('unit')">← Retour</button>
+            <div class="chapter-prog">
+              <div class="ch-prog-label" id="ch-prog-label">Chapitre 1/1</div>
+              <div class="ch-prog-dots" id="ch-prog-dots"></div>
+            </div>
+          </div>
+          <div id="theory-content"></div>
+          <div class="theory-nav" id="theory-nav"></div>
+        </div>
+      </div>
+
+      <!-- SANDBOX -->
+      <div class="view" id="view-sandbox">
+        <div class="sandbox-shell">
+          <div class="sandbox-header">
+            <button class="back-btn" onclick="showView('unit')">← Retour</button>
+            <div class="lesson-meta"><h2 id="sandbox-title">Sandbox</h2><p>Écrivez et testez votre code</p></div>
+          </div>
+          <div class="sandbox-body">
+            <div class="sandbox-panel">
+              <div class="sp-header">
+                <span class="sp-title" id="sb-lang-label">Python</span>
+                <div class="sp-actions">
+                  <button class="sp-btn reset" onclick="resetEditor()">↺ Reset</button>
+                  <button class="sp-btn run" onclick="runCode()">▶ Exécuter</button>
+                </div>
+              </div>
+              <textarea class="code-editor" id="code-editor" spellcheck="false"></textarea>
+            </div>
+            <div class="sandbox-panel">
+              <div class="sp-header">
+                <span class="sp-title">Sortie</span>
+                <button class="sp-btn" onclick="clearOutput()">Effacer</button>
+              </div>
+              <div class="output-area" id="output-area">
+                <span class="out-info">Cliquez ▶ Exécuter pour voir le résultat…</span>
+              </div>
+            </div>
+          </div>
+          <div class="sandbox-exercises">
+            <div class="ex-title">Exercices guidés</div>
+            <div class="ex-list" id="ex-list"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- QUIZ -->
+      <div class="view" id="view-quiz">
+        <div class="quiz-shell">
+          <div class="quiz-topbar">
+            <button class="back-btn" onclick="exitQuiz()">✕</button>
+            <div class="q-prog-wrap"><div class="q-prog-track"><div class="q-prog-fill" id="q-prog" style="width:0%"></div></div></div>
+            <div class="q-counter" id="q-ctr">1/5</div>
+            <div class="inf-badge">♾️ Sans limite</div>
+          </div>
+          <div class="quiz-card">
+            <div class="q-pill" id="q-pill">QCM</div>
+            <div class="q-txt" id="q-txt"></div>
+            <div class="q-code" id="q-code" style="display:none"></div>
+            <div id="q-opts"></div>
+            <div class="feedback" id="q-fb">
+              <span class="fb-ico" id="fb-ico"></span>
+              <div class="fb-body"><strong id="fb-title"></strong><span id="fb-det"></span></div>
+            </div>
+            <div class="quiz-acts">
+              <button class="q-btn skip" id="skip-btn" onclick="skipQ()">Passer</button>
+              <button class="q-btn primary" id="submit-btn" onclick="handleSubmit()" disabled>Vérifier</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RESULTS -->
+      <div class="view" id="view-results">
+        <div class="results-wrap">
+          <span class="res-trophy" id="res-trophy">🎉</span>
+          <div class="res-title" id="res-title">Terminé !</div>
+          <div class="res-sub" id="res-sub"></div>
+          <div class="res-stats">
+            <div class="r-stat"><div class="rv" id="rv-xp" style="color:var(--a4)">+0</div><div class="rl">XP</div></div>
+            <div class="r-stat"><div class="rv" id="rv-acc" style="color:var(--a)">0%</div><div class="rl">Précision</div></div>
+            <div class="r-stat"><div class="rv" id="rv-time" style="color:var(--a2)">0:00</div><div class="rl">Temps</div></div>
+          </div>
+          <div class="res-btns">
+            <button class="r-btn main" onclick="showView('home')">🏠 Accueil</button>
+            <button class="r-btn sec" onclick="replayQuiz()">🔁 Rejouer</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- LEADERBOARD -->
+      <div class="view" id="view-lb">
+        <div class="lb-h"><h1>🏆 Classement</h1><span class="lb-badge">Cette semaine</span></div>
+        <div class="lb-rows" id="lb-rows"></div>
+      </div>
+
+      <!-- PROFILE -->
+      <div class="view" id="view-profile">
+        <div class="p-top">
+          <div class="p-ava" id="p-ava">🧑</div>
+          <div class="p-inf">
+            <h2 id="p-name">—</h2>
+            <div class="p-email" id="p-email">—</div>
+            <div class="p-cloud">☁️ Données sauvegardées sur Firebase</div>
+          </div>
+        </div>
+        <div class="p-stats">
+          <div class="ps"><div class="pv" id="ps-xp" style="color:var(--a4)">0</div><div class="pl">Total XP</div></div>
+          <div class="ps"><div class="pv" id="ps-str" style="color:#fb923c">🔥0</div><div class="pl">Série</div></div>
+          <div class="ps"><div class="pv" id="ps-les" style="color:var(--a)">0</div><div class="pl">Leçons</div></div>
+          <div class="ps"><div class="pv" id="ps-acc" style="color:var(--a2)">0%</div><div class="pl">Précision</div></div>
+        </div>
+        <div class="sec-h" style="margin-bottom:.8rem">Succès</div>
+        <div class="ach-g" id="ach-grid"></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+//  CONTENT DATA
+// ═══════════════════════════════════════════════════════════
+const AVATARS=['🧑','👨‍💻','👩‍💻','🧑‍💻','🦊','🐉','🤖','🎮','⚡','🌟','🧙','👾'];
+let selAva=AVATARS[0];
+
+// ── COURSES ────────────────────────────────────────────────
+const COURSES=[
+  {id:'python',name:'Python',icon:'🐍',color:'#5eead4',desc:'Variables, boucles, fonctions, POO',badge:'Populaire',
+   units:[
+    {id:'py-var', icon:'📦',name:'Variables & Types',     desc:'int, str, float, bool, type()',xp:10},
+    {id:'py-cond',icon:'🔀',name:'Conditions if/else',    desc:'if, elif, else, opérateurs logiques',xp:10},
+    {id:'py-loop',icon:'🔁',name:'Boucles for & while',   desc:'range(), break, continue, enumerate',xp:15},
+    {id:'py-func',icon:'⚙️',name:'Fonctions',             desc:'def, return, *args, **kwargs, lambda',xp:15,locked:true},
+    {id:'py-list',icon:'📋',name:'Listes & Tuples',       desc:'Indexing, slicing, list comprehensions',xp:20,locked:true},
+    {id:'py-dict',icon:'📖',name:'Dictionnaires',         desc:'Clés, valeurs, méthodes, parcours',xp:20,locked:true},
+    {id:'py-oop', icon:'🏛️',name:'Classes & POO',        desc:'class, héritage, __init__, méthodes',xp:25,locked:true},
+   ]},
+  {id:'javascript',name:'JavaScript',icon:'⚡',color:'#fbbf24',desc:'ES6+, DOM, async/await, APIs',badge:null,
+   units:[
+    {id:'js-var', icon:'📦',name:'Variables & Types',     desc:'let, const, var, typeof, coercion',xp:10},
+    {id:'js-func',icon:'🎯',name:'Fonctions & Arrow',     desc:'function, =>, callbacks, scope, closure',xp:15},
+    {id:'js-dom', icon:'🌐',name:'DOM & Événements',      desc:'querySelector, addEventListener, classList',xp:20,locked:true},
+    {id:'js-async',icon:'🔄',name:'Async / Await',        desc:'Promise, fetch, try/catch, API REST',xp:25,locked:true},
+   ]},
+  {id:'java',name:'Java',icon:'☕',color:'#e76f51',desc:'Types forts, POO, Collections, JVM',badge:'Complet',
+   units:[
+    {id:'jv-base',icon:'🖥️',name:'Syntaxe de base',      desc:'System.out, types primitifs, String',xp:10},
+    {id:'jv-class',icon:'🏛️',name:'Classes & Objets',    desc:'class, new, constructeur, this, static',xp:15},
+    {id:'jv-inh', icon:'🔗',name:'Héritage & Polymorphisme',desc:'extends, super, @Override, abstract',xp:20,locked:true},
+    {id:'jv-coll',icon:'📚',name:'Collections & Generics',desc:'ArrayList, HashMap, for-each, Iterator',xp:20,locked:true},
+    {id:'jv-exc', icon:'⚠️',name:'Exceptions',            desc:'try, catch, finally, throws, custom',xp:15,locked:true},
+   ]},
+  {id:'html',name:'HTML/CSS',icon:'🌐',color:'#f472b6',desc:'Structure, styles, Flexbox, Grid, animations',badge:'Facile',
+   units:[
+    {id:'ht-base',icon:'🏗️',name:'Balises HTML',         desc:'Structure, sémantique, attributs, formulaires',xp:10},
+    {id:'ht-css', icon:'🎨',name:'CSS Fondamentaux',      desc:'Sélecteurs, box model, couleurs, polices',xp:10},
+    {id:'ht-flex',icon:'📐',name:'Flexbox',               desc:'display:flex, justify-content, align-items',xp:15,locked:true},
+    {id:'ht-grid',icon:'🔲',name:'CSS Grid',              desc:'grid-template, areas, auto-fill, gaps',xp:15,locked:true},
+   ]},
+  {id:'linux',name:'Linux/Ubuntu',icon:'🐧',color:'#a78bfa',desc:'Terminal, Bash scripts, réseau, services',badge:'Nouveau',
+   units:[
+    {id:'lx-term',icon:'💻',name:'Terminal Basics',       desc:'ls, cd, pwd, mkdir, rm, cp, mv, man',xp:10},
+    {id:'lx-perm',icon:'🔒',name:'Fichiers & Permissions',desc:'chmod, chown, cat, nano, grep, find',xp:15},
+    {id:'lx-bash',icon:'⚡',name:'Bash Scripting',        desc:'Variables, conditions, boucles, fonctions',xp:20,locked:true},
+    {id:'lx-apt', icon:'📦',name:'APT & Paquets',         desc:'install, update, upgrade, remove, search',xp:10,locked:true},
+   ]},
+  {id:'minecraft',name:'Minecraft Mods',icon:'⛏️',color:'#5eab3c',desc:'Forge, items, blocs, events, datapacks',badge:'Fun !',
+   units:[
+    {id:'mc-env', icon:'🛠️',name:'Environnement de Dev', desc:'JDK, Forge MDK, IntelliJ IDEA, Gradle',xp:15},
+    {id:'mc-item',icon:'💎',name:'Créer des Items',       desc:'Item class, registry, modèle JSON, texture',xp:20},
+    {id:'mc-block',icon:'🧱',name:'Créer des Blocs',      desc:'Block class, propriétés, loot tables, drops',xp:20,locked:true},
+    {id:'mc-event',icon:'🎮',name:'Événements & Handlers',desc:'@SubscribeEvent, PlayerEvent, TickEvent',xp:25,locked:true},
+    {id:'mc-rp',  icon:'🎨',name:'Resource Packs',        desc:'Textures PNG 16x16, sounds.json, lang',xp:15,locked:true},
+    {id:'mc-dp',  icon:'📜',name:'Datapacks',             desc:'.mcfunction, advancements, loot_tables',xp:15,locked:true},
+   ]},
+  {id:'wow',name:'WoW Add-ons',icon:'🧙',color:'#c79a3e',desc:'Lua, API Blizzard, Frames, Events',badge:'MMO',
+   units:[
+    {id:'wo-lua', icon:'📜',name:'Lua Fondamentaux',      desc:'Variables, tables, fonctions, métatable',xp:15},
+    {id:'wo-toc', icon:'📋',name:'Structure Add-on',      desc:'.toc metadata, ordre de chargement',xp:15},
+    {id:'wo-frame',icon:'🖼️',name:'Frames & UI',         desc:'CreateFrame, SetPoint, SetSize, texture',xp:20,locked:true},
+    {id:'wo-event',icon:'⚡',name:'Événements WoW',       desc:'RegisterEvent, COMBAT_LOG, PLAYER_LOGIN',xp:20,locked:true},
+    {id:'wo-api', icon:'🔮',name:'API Blizzard',          desc:'UnitHealth, GetSpellInfo, C_Item',xp:25,locked:true},
+   ]},
+  {id:'git',name:'Git & GitHub',icon:'🌿',color:'#f9a8d4',desc:'Versioning, branches, PRs, CI/CD',badge:null,
+   units:[
+    {id:'gt-init',icon:'📝',name:'Init & Commit',         desc:'git init, add, commit, status, log, diff',xp:10},
+    {id:'gt-br',  icon:'🌿',name:'Branches & Merge',      desc:'branch, checkout, merge, rebase, conflicts',xp:15,locked:true},
+    {id:'gt-remote',icon:'🌐',name:'GitHub & Remote',     desc:'remote, push, pull, clone, fork, PR',xp:15,locked:true},
+   ]},
+];
+
+// ── THEORY CONTENT ─────────────────────────────────────────
+const THEORY = {
+  'py-var': {
+    title:'Variables & Types en Python',
+    chapters:[
+      {
+        title:'Qu\'est-ce qu\'une variable ?',
+        content:`
+<p>Une <strong>variable</strong> est une boîte nommée qui stocke une valeur en mémoire. En Python, vous créez une variable simplement en lui assignant une valeur — pas besoin de déclarer le type !</p>
+<div class="codeblock"><span class="cb-lang">Python</span><button class="copy-btn" onclick="copyCode(this)">Copier</button><span class="cm"># Création de variables</span>
+<span class="kw">nom</span> = <span class="str">"Alice"</span>          <span class="cm"># str (chaîne de texte)</span>
+<span class="kw">age</span> = <span class="num">25</span>               <span class="cm"># int (entier)</span>
+<span class="kw">taille</span> = <span class="num">1.68</span>          <span class="cm"># float (décimal)</span>
+<span class="kw">est_etudiant</span> = <span class="kw">True</span>   <span class="cm"># bool (booléen)</span>
+
+<span class="fn">print</span>(nom)    <span class="cm"># Affiche: Alice</span>
+<span class="fn">print</span>(age)    <span class="cm"># Affiche: 25</span></div>
+<div class="tip">💡 En Python, le nom de variable est sensible à la casse : <code>Age</code> et <code>age</code> sont deux variables différentes !</div>
+<h3>Les 4 types de base</h3>
+<ul>
+  <li><strong>int</strong> — Nombres entiers : <code>42</code>, <code>-7</code>, <code>0</code></li>
+  <li><strong>float</strong> — Nombres décimaux : <code>3.14</code>, <code>-0.5</code>, <code>2.0</code></li>
+  <li><strong>str</strong> — Texte entre guillemets : <code>"Bonjour"</code>, <code>'Hello'</code></li>
+  <li><strong>bool</strong> — Vrai ou faux : <code>True</code>, <code>False</code></li>
+</ul>`
+      },
+      {
+        title:'Opérations et conversion de types',
+        content:`
+<h3>Opérations arithmétiques</h3>
+<div class="codeblock"><span class="cb-lang">Python</span><button class="copy-btn" onclick="copyCode(this)">Copier</button>a = <span class="num">10</span>
+b = <span class="num">3</span>
+
+<span class="fn">print</span>(a <span class="op">+</span> b)    <span class="cm"># Addition:      13</span>
+<span class="fn">print</span>(a <span class="op">-</span> b)    <span class="cm"># Soustraction:  7</span>
+<span class="fn">print</span>(a <span class="op">*</span> b)    <span class="cm"># Multiplication: 30</span>
+<span class="fn">print</span>(a <span class="op">/</span> b)    <span class="cm"># Division:      3.333...</span>
+<span class="fn">print</span>(a <span class="op">//</span> b)   <span class="cm"># Division entière: 3</span>
+<span class="fn">print</span>(a <span class="op">%</span> b)    <span class="cm"># Modulo (reste): 1</span>
+<span class="fn">print</span>(a <span class="op">**</span> b)   <span class="cm"># Puissance:     1000</span></div>
+<h3>Convertir un type (casting)</h3>
+<div class="codeblock"><span class="cb-lang">Python</span><button class="copy-btn" onclick="copyCode(this)">Copier</button>age_texte = <span class="str">"25"</span>
+age_entier = <span class="fn">int</span>(age_texte)   <span class="cm"># str → int</span>
+prix = <span class="fn">float</span>(<span class="str">"9.99"</span>)         <span class="cm"># str → float</span>
+texte = <span class="fn">str</span>(<span class="num">42</span>)               <span class="cm"># int → str</span>
+
+<span class="fn">print</span>(<span class="fn">type</span>(age_entier))  <span class="cm"># &lt;class 'int'&gt;</span>
+<span class="fn">print</span>(<span class="fn">type</span>(prix))        <span class="cm"># &lt;class 'float'&gt;</span></div>
+<div class="warn">⚠️ <code>int("abc")</code> provoque une erreur ! On ne peut convertir que des valeurs compatibles.</div>`
+      },
+      {
+        title:'f-strings et affichage',
+        content:`
+<p>Les <strong>f-strings</strong> (format strings) sont la façon moderne et élégante d'insérer des variables dans du texte en Python.</p>
+<div class="codeblock"><span class="cb-lang">Python</span><button class="copy-btn" onclick="copyCode(this)">Copier</button>prenom = <span class="str">"Bob"</span>
+age = <span class="num">30</span>
+taille = <span class="num">1.75</span>
+
+<span class="cm"># Méthode classique (vieux style)</span>
+<span class="fn">print</span>(<span class="str">"Je m'appelle"</span>, prenom, <span class="str">"et j'ai"</span>, age, <span class="str">"ans"</span>)
+
+<span class="cm"># f-string (Python 3.6+) — recommandé !</span>
+<span class="fn">print</span>(<span class="str">f"Je m'appelle <span class="op">{prenom}</span> et j'ai <span class="op">{age}</span> ans"</span>)
+<span class="fn">print</span>(<span class="str">f"Taille: <span class="op">{taille:.2f}</span>m"</span>)  <span class="cm"># 2 décimales: 1.75m</span>
+<span class="fn">print</span>(<span class="str">f"Double: <span class="op">{age * 2}</span>"</span>)      <span class="cm"># Calcul dans le f-string</span></div>
+<div class="tip">💡 Le <code>f</code> devant les guillemets active le mode f-string. Tout ce qui est entre <code>{}</code> est évalué comme du Python !</div>
+<h3>Entrée utilisateur</h3>
+<div class="codeblock"><span class="cb-lang">Python</span><button class="copy-btn" onclick="copyCode(this)">Copier</button><span class="cm"># input() retourne TOUJOURS une str</span>
+nom = <span class="fn">input</span>(<span class="str">"Votre prénom : "</span>)
+age = <span class="fn">int</span>(<span class="fn">input</span>(<span class="str">"Votre âge : "</span>))  <span class="cm"># Convertir en int</span>
+<span class="fn">print</span>(<span class="str">f"Bonjour {nom}, vous avez {age} ans !"</span>)</div>`
+      }
+    ]
+  },
+  'py-loop': {
+    title:'Boucles for & while en Python',
+    chapters:[
+      {
+        title:'La boucle for et range()',
+        content:`
+<p>La boucle <code>for</code> répète un bloc de code pour chaque élément d'une séquence. C'est la boucle la plus utilisée en Python.</p>
+<div class="codeblock"><span class="cb-lang">Python</span><button class="copy-btn" onclick="copyCode(this)">Copier</button><span class="cm"># range(stop) → 0, 1, 2, ..., stop-1</span>
+<span class="kw">for</span> i <span class="kw">in</span> <span class="fn">range</span>(<span class="num">5</span>):
+    <span class="fn">print</span>(i)   <span class="cm"># Affiche 0, 1, 2, 3, 4</span>
+
+<span class="cm"># range(start, stop)</span>
+<span class="kw">for</span> i <span class="kw">in</span> <span class="fn">range</span>(<span class="num">1</span>, <span class="num">6</span>):
+    <span class="fn">print</span>(i)   <span class="cm"># Affiche 1, 2, 3, 4, 5</span>
+
+<span class="cm"># range(start, stop, step) — pas de 2</span>
+<span class="kw">for</span> i <span class="kw">in</span> <span class="fn">range</span>(<span class="num">0</span>, <span class="num">11</span>, <span class="num">2</span>):
+    <span class="fn">print</span>(i)   <span class="cm"># Affiche 0, 2, 4, 6, 8, 10</span></div>
+<h3>Itérer sur une liste</h3>
+<div class="codeblock"><span class="cb-lang">Python</span><button class="copy-btn" onclick="copyCode(this)">Copier</button>fruits = [<span class="str">"pomme"</span>, <span class="str">"banane"</span>, <span class="str">"cerise"</span>]
+
+<span class="kw">for</span> fruit <span class="kw">in</span> fruits:
+    <span class="fn">print</span>(<span class="str">f"J'aime les {fruit}s"</span>)
+
+<span class="cm"># enumerate() donne l'index ET la valeur</span>
+<span class="kw">for</span> i, fruit <span class="kw">in</span> <span class="fn">enumerate</span>(fruits):
+    <span class="fn">print</span>(<span class="str">f"{i}: {fruit}"</span>)</div>`
+      },
+      {
+        title:'La boucle while et les contrôles',
+        content:`
+<p>La boucle <code>while</code> continue tant qu'une condition est vraie. Idéale quand on ne sait pas à l'avance combien d'itérations on aura.</p>
+<div class="codeblock"><span class="cb-lang">Python</span><button class="copy-btn" onclick="copyCode(this)">Copier</button>compteur = <span class="num">0</span>
+
+<span class="kw">while</span> compteur <span class="op">&lt;</span> <span class="num">5</span>:
+    <span class="fn">print</span>(<span class="str">f"Compteur: {compteur}"</span>)
+    compteur <span class="op">+=</span> <span class="num">1</span>   <span class="cm"># IMPORTANT: incrémenter !</span>
+
+<span class="cm"># Résultat: 0, 1, 2, 3, 4</span></div>
+<div class="warn">⚠️ Oublier d'incrémenter le compteur crée une boucle infinie ! Utilisez Ctrl+C pour arrêter le programme.</div>
+<h3>break et continue</h3>
+<div class="codeblock"><span class="cb-lang">Python</span><button class="copy-btn" onclick="copyCode(this)">Copier</button><span class="cm"># break : quitte la boucle immédiatement</span>
+<span class="kw">for</span> i <span class="kw">in</span> <span class="fn">range</span>(<span class="num">10</span>):
+    <span class="kw">if</span> i <span class="op">==</span> <span class="num">5</span>:
+        <span class="kw">break</span>
+    <span class="fn">print</span>(i)   <span class="cm"># Affiche 0, 1, 2, 3, 4</span>
+
+<span class="cm"># continue : passe à l'itération suivante</span>
+<span class="kw">for</span> i <span class="kw">in</span> <span class="fn">range</span>(<span class="num">6</span>):
+    <span class="kw">if</span> i <span class="op">%</span> <span class="num">2</span> <span class="op">==</span> <span class="num">0</span>:
+        <span class="kw">continue</span>
+    <span class="fn">print</span>(i)   <span class="cm"># Affiche 1, 3, 5 (impairs seulement)</span></div>`
+      }
+    ]
+  },
+  'jv-base': {
+    title:'Syntaxe de base Java',
+    chapters:[
+      {
+        title:'Hello World et structure d\'un programme Java',
+        content:`
+<p>Java est un langage <strong>fortement typé</strong> et <strong>orienté objet</strong>. Tout le code doit être dans une classe. Voici la structure minimale :</p>
+<div class="codeblock"><span class="cb-lang">Java</span><button class="copy-btn" onclick="copyCode(this)">Copier</button><span class="kw">public class</span> <span class="cls">HelloWorld</span> {
+    <span class="cm">// Point d'entrée du programme</span>
+    <span class="kw">public static void</span> <span class="fn">main</span>(String[] args) {
+        System.out.<span class="fn">println</span>(<span class="str">"Hello, World!"</span>);
+        System.out.<span class="fn">println</span>(<span class="str">"Bonjour Java !"</span>);
+    }
+}</div>
+<div class="note">ℹ️ Le nom du fichier doit être identique au nom de la classe : <code>HelloWorld.java</code></div>
+<h3>Types primitifs Java</h3>
+<div class="codeblock"><span class="cb-lang">Java</span><button class="copy-btn" onclick="copyCode(this)">Copier</button><span class="kw">int</span> age = <span class="num">25</span>;              <span class="cm">// Entier (-2³¹ à 2³¹-1)</span>
+<span class="kw">long</span> population = <span class="num">8000000000L</span>; <span class="cm">// Grand entier</span>
+<span class="kw">double</span> pi = <span class="num">3.14159</span>;        <span class="cm">// Décimal précis</span>
+<span class="kw">float</span> prix = <span class="num">9.99f</span>;         <span class="cm">// Décimal (moins précis)</span>
+<span class="kw">boolean</span> actif = <span class="kw">true</span>;       <span class="cm">// Vrai ou faux</span>
+<span class="kw">char</span> lettre = <span class="str">'A'</span>;          <span class="cm">// Un seul caractère</span>
+<span class="cls">String</span> nom = <span class="str">"Alice"</span>;       <span class="cm">// Texte (objet, pas primitif !)</span></div>`
+      },
+      {
+        title:'Opérations et affichage en Java',
+        content:`
+<h3>Opérations arithmétiques</h3>
+<div class="codeblock"><span class="cb-lang">Java</span><button class="copy-btn" onclick="copyCode(this)">Copier</button><span class="kw">int</span> a = <span class="num">10</span>, b = <span class="num">3</span>;
+
+System.out.<span class="fn">println</span>(a + b);   <span class="cm">// 13</span>
+System.out.<span class="fn">println</span>(a - b);   <span class="cm">// 7</span>
+System.out.<span class="fn">println</span>(a * b);   <span class="cm">// 30</span>
+System.out.<span class="fn">println</span>(a / b);   <span class="cm">// 3  (division entière !)</span>
+System.out.<span class="fn">println</span>(a % b);   <span class="cm">// 1  (modulo)</span>
+System.out.<span class="fn">println</span>(<span class="fn">Math.pow</span>(a, b)); <span class="cm">// 1000.0</span></div>
+<h3>Affichage formaté</h3>
+<div class="codeblock"><span class="cb-lang">Java</span><button class="copy-btn" onclick="copyCode(this)">Copier</button><span class="cls">String</span> prenom = <span class="str">"Bob"</span>;
+<span class="kw">int</span> age = <span class="num">30</span>;
+<span class="kw">double</span> note = <span class="num">18.5</span>;
+
+<span class="cm">// Concaténation avec +</span>
+System.out.<span class="fn">println</span>(<span class="str">"Bonjour "</span> + prenom + <span class="str">", age: "</span> + age);
+
+<span class="cm">// printf avec formatage</span>
+System.out.<span class="fn">printf</span>(<span class="str">"Prénom: %s, Age: %d, Note: %.1f%n"</span>, prenom, age, note);
+
+<span class="cm">// String.format (retourne une String)</span>
+<span class="cls">String</span> msg = <span class="cls">String</span>.<span class="fn">format</span>(<span class="str">"Bonjour %s !"</span>, prenom);
+System.out.<span class="fn">println</span>(msg);</div>
+<div class="tip">💡 <code>%s</code>=texte, <code>%d</code>=entier, <code>%.2f</code>=décimal 2 chiffres, <code>%n</code>=retour à la ligne</div>`
+      }
+    ]
+  },
+  'lx-term': {
+    title:'Terminal Linux — Les bases',
+    chapters:[
+      {
+        title:'Navigation dans le système de fichiers',
+        content:`
+<p>Le <strong>terminal</strong> (ou shell) est l'interface en ligne de commande de Linux. Maîtriser la navigation est la première étape essentielle.</p>
+<div class="codeblock"><span class="cb-lang">Bash</span><button class="copy-btn" onclick="copyCode(this)">Copier</button><span class="cm"># pwd — Print Working Directory (où suis-je ?)</span>
+<span class="fn">pwd</span>
+<span class="cm"># Résultat: /home/utilisateur</span>
+
+<span class="cm"># ls — List (lister les fichiers)</span>
+<span class="fn">ls</span>              <span class="cm"># Liste simple</span>
+<span class="fn">ls</span> <span class="at">-l</span>           <span class="cm"># Liste détaillée (permissions, taille, date)</span>
+<span class="fn">ls</span> <span class="at">-la</span>          <span class="cm"># Inclut les fichiers cachés (commençant par .)</span>
+<span class="fn">ls</span> <span class="at">-lh</span>          <span class="cm"># Tailles lisibles (Ko, Mo, Go)</span>
+
+<span class="cm"># cd — Change Directory (naviguer)</span>
+<span class="fn">cd</span> Documents    <span class="cm"># Aller dans Documents</span>
+<span class="fn">cd</span> ..           <span class="cm"># Remonter d'un niveau</span>
+<span class="fn">cd</span> ~            <span class="cm"># Aller au répertoire home</span>
+<span class="fn">cd</span> /            <span class="cm"># Aller à la racine du système</span>
+<span class="fn">cd</span> -            <span class="cm"># Revenir au dossier précédent</span></div>
+<div class="tip">💡 Utilisez la touche <kbd>Tab</kbd> pour l'autocomplétion des noms de fichiers/dossiers !</div>`
+      },
+      {
+        title:'Créer, copier, déplacer et supprimer',
+        content:`
+<div class="codeblock"><span class="cb-lang">Bash</span><button class="copy-btn" onclick="copyCode(this)">Copier</button><span class="cm"># mkdir — Créer un dossier</span>
+<span class="fn">mkdir</span> mon_projet
+<span class="fn">mkdir</span> <span class="at">-p</span> projet/src/utils   <span class="cm"># Crée les parents si nécessaire</span>
+
+<span class="cm"># touch — Créer un fichier vide</span>
+<span class="fn">touch</span> readme.txt
+<span class="fn">touch</span> index.html style.css   <span class="cm"># Plusieurs fichiers à la fois</span>
+
+<span class="cm"># cp — Copier</span>
+<span class="fn">cp</span> fichier.txt copie.txt
+<span class="fn">cp</span> <span class="at">-r</span> dossier/ dossier_copie/   <span class="cm"># -r pour copier un dossier</span>
+
+<span class="cm"># mv — Déplacer / Renommer</span>
+<span class="fn">mv</span> ancien.txt nouveau.txt      <span class="cm"># Renommer</span>
+<span class="fn">mv</span> fichier.txt ~/Documents/    <span class="cm"># Déplacer</span>
+
+<span class="cm"># rm — Supprimer</span>
+<span class="fn">rm</span> fichier.txt
+<span class="fn">rm</span> <span class="at">-r</span> dossier/               <span class="cm"># Supprimer un dossier récursivement</span>
+<span class="fn">rm</span> <span class="at">-rf</span> dossier/              <span class="cm"># Force (sans confirmation)</span></div>
+<div class="warn">⚠️ <code>rm -rf</code> est IRRÉVERSIBLE ! Il n'y a pas de corbeille. Vérifiez deux fois avant d'exécuter.</div>
+<h3>Lire des fichiers</h3>
+<div class="codeblock"><span class="cb-lang">Bash</span><button class="copy-btn" onclick="copyCode(this)">Copier</button><span class="fn">cat</span> fichier.txt          <span class="cm"># Affiche tout le contenu</span>
+<span class="fn">less</span> fichier.txt         <span class="cm"># Affiche page par page (q pour quitter)</span>
+<span class="fn">head</span> <span class="at">-n 10</span> fichier.txt   <span class="cm"># 10 premières lignes</span>
+<span class="fn">tail</span> <span class="at">-n 10</span> fichier.txt   <span class="cm"># 10 dernières lignes</span>
+<span class="fn">grep</span> <span class="str">"mot"</span> fichier.txt   <span class="cm"># Chercher "mot" dans le fichier</span></div>`
+      }
+    ]
+  },
+  'mc-env': {
+    title:'Environnement de développement Minecraft',
+    chapters:[
+      {
+        title:'Choisir son loader : Forge vs Fabric',
+        content:`
+<p>Pour créer des mods Minecraft, vous avez besoin d'un <strong>mod loader</strong> — un framework qui permet d'injecter votre code dans le jeu.</p>
+<h3>Forge</h3>
+<ul>
+  <li>✅ Le plus ancien et le plus utilisé (depuis 2012)</li>
+  <li>✅ Énorme écosystème de mods existants</li>
+  <li>✅ Documentation abondante</li>
+  <li>⚠️ Se met à jour plus lentement après chaque nouvelle version Minecraft</li>
+</ul>
+<h3>Fabric</h3>
+<ul>
+  <li>✅ Plus léger et moderne (depuis 2019)</li>
+  <li>✅ Se met à jour très rapidement</li>
+  <li>✅ API plus propre pour les développeurs</li>
+  <li>⚠️ Moins de mods dans l'écosystème</li>
+</ul>
+<div class="tip">💡 Pour Minecraft 1.20+, les deux sont bons. Ce cours utilise <strong>Forge</strong> car il a plus de ressources d'apprentissage.</div>
+<h3>Prérequis à installer</h3>
+<div class="codeblock"><span class="cb-lang">Setup</span><button class="copy-btn" onclick="copyCode(this)">Copier</button>1. JDK 17 (Java Development Kit)
+   → https://adoptium.net/
+
+2. IntelliJ IDEA Community (gratuit)
+   → https://www.jetbrains.com/idea/
+
+3. Forge MDK (Mod Development Kit)
+   → https://files.minecraftforge.net/
+   → Choisissez la version Minecraft souhaitée</div>`
+      },
+      {
+        title:'Créer son premier projet Forge',
+        content:`
+<h3>Structure du projet après extraction du MDK</h3>
+<div class="codeblock"><span class="cb-lang">Structure</span><button class="copy-btn" onclick="copyCode(this)">Copier</button>mon_mod/
+├── src/main/java/com/monnom/monmod/
+│   └── MonMod.java          ← Classe principale
+├── src/main/resources/
+│   ├── META-INF/
+│   │   └── mods.toml        ← Métadonnées du mod
+│   └── pack.mcmeta
+├── build.gradle             ← Configuration Gradle
+└── gradle.properties        ← Propriétés (version, etc.)</div>
+<h3>La classe principale du mod</h3>
+<div class="codeblock"><span class="cb-lang">Java</span><button class="copy-btn" onclick="copyCode(this)">Copier</button><span class="at">@Mod</span>(<span class="str">"monmod"</span>)    <span class="cm">// ID unique de votre mod</span>
+<span class="kw">public class</span> <span class="cls">MonMod</span> {
+    <span class="kw">public static final</span> <span class="cls">String</span> MOD_ID = <span class="str">"monmod"</span>;
+
+    <span class="kw">public</span> <span class="cls">MonMod</span>() {
+        <span class="cm">// Enregistrement des événements</span>
+        <span class="cls">IEventBus</span> bus = <span class="cls">FMLJavaModLoadingContext</span>.<span class="fn">get</span>()
+                          .<span class="fn">getModEventBus</span>();
+
+        <span class="cm">// Vos registrations ici</span>
+        System.out.<span class="fn">println</span>(<span class="str">"Mon mod est chargé !"</span>);
+    }
+}</div>
+<h3>Le fichier mods.toml</h3>
+<div class="codeblock"><span class="cb-lang">TOML</span><button class="copy-btn" onclick="copyCode(this)">Copier</button>modLoader="javafml"
+loaderVersion="[47,)"
+license="MIT"
+
+[[mods]]
+modId="monmod"
+version="1.0.0"
+displayName="Mon Premier Mod"
+description='''
+  Un mod créé avec CodeQuest !
+'''
+
+[[dependencies.monmod]]
+    modId="forge"
+    mandatory=true
+    versionRange="[47,)"</div>`
+      }
+    ]
+  },
+  'wo-lua': {
+    title:'Lua — Le langage des Add-ons WoW',
+    chapters:[
+      {
+        title:'Bases du langage Lua',
+        content:`
+<p>Lua est un langage de script léger, rapide et embarqué dans World of Warcraft. Tous les add-ons WoW sont écrits en Lua.</p>
+<div class="codeblock"><span class="cb-lang">Lua</span><button class="copy-btn" onclick="copyCode(this)">Copier</button><span class="cm">-- Commentaire sur une ligne (double tiret)</span>
+<span class="cm">--[[ Commentaire
+     multi-lignes ]]</span>
+
+<span class="cm">-- Variables : local (recommandé) ou global</span>
+<span class="kw">local</span> prenom = <span class="str">"Thrall"</span>        <span class="cm">-- string</span>
+<span class="kw">local</span> niveau = <span class="num">60</span>             <span class="cm">-- number</span>
+<span class="kw">local</span> estEnVie = <span class="kw">true</span>         <span class="cm">-- boolean</span>
+<span class="kw">local</span> rien = <span class="kw">nil</span>              <span class="cm">-- nil = absence de valeur</span>
+
+<span class="cm">-- Affichage dans le chat WoW</span>
+<span class="fn">print</span>(<span class="str">"Bonjour "</span> .. prenom)    <span class="cm">-- .. = concaténation</span>
+<span class="fn">print</span>(<span class="str">"Niveau: "</span> .. niveau)</div>
+<div class="tip">💡 En Lua, il n'y a qu'un seul type numérique : <code>number</code>. Pas de distinction int/float !</div>
+<h3>Fonctions Lua</h3>
+<div class="codeblock"><span class="cb-lang">Lua</span><button class="copy-btn" onclick="copyCode(this)">Copier</button><span class="cm">-- Déclaration de fonction</span>
+<span class="kw">local function</span> <span class="fn">direBonjour</span>(nom)
+    <span class="fn">print</span>(<span class="str">"Bienvenue, "</span> .. nom .. <span class="str">" !"</span>)
+<span class="kw">end</span>
+
+<span class="cm">-- Appel</span>
+<span class="fn">direBonjour</span>(<span class="str">"Arthas"</span>)
+
+<span class="cm">-- Fonction retournant plusieurs valeurs</span>
+<span class="kw">local function</span> <span class="fn">stats</span>()
+    <span class="kw">return</span> <span class="num">100</span>, <span class="num">250</span>, <span class="num">50</span>   <span class="cm">-- hp, mana, energie</span>
+<span class="kw">end</span>
+
+<span class="kw">local</span> hp, mana, energie = <span class="fn">stats</span>()
+<span class="fn">print</span>(<span class="str">"HP: "</span> .. hp)</div>`
+      },
+      {
+        title:'Tables Lua — La structure de données universelle',
+        content:`
+<p>Les <strong>tables</strong> sont la seule structure de données en Lua. Elles peuvent être utilisées comme tableaux, dictionnaires, objets et modules !</p>
+<div class="codeblock"><span class="cb-lang">Lua</span><button class="copy-btn" onclick="copyCode(this)">Copier</button><span class="cm">-- Table comme tableau (index commence à 1 en Lua !)</span>
+<span class="kw">local</span> classes = {<span class="str">"Guerrier"</span>, <span class="str">"Mage"</span>, <span class="str">"Prêtre"</span>}
+<span class="fn">print</span>(classes[<span class="num">1</span>])    <span class="cm">-- "Guerrier" (pas 0 !)</span>
+<span class="fn">print</span>(<span class="op">#</span>classes)      <span class="cm">-- 3 (longueur)</span>
+
+<span class="cm">-- Table comme dictionnaire</span>
+<span class="kw">local</span> joueur = {
+    nom = <span class="str">"Arthas"</span>,
+    niveau = <span class="num">60</span>,
+    classe = <span class="str">"Paladin"</span>,
+    estEnVie = <span class="kw">false</span>
+}
+<span class="fn">print</span>(joueur.nom)         <span class="cm">-- "Arthas"</span>
+<span class="fn">print</span>(joueur[<span class="str">"classe"</span>])  <span class="cm">-- "Paladin"</span>
+
+<span class="cm">-- Parcourir une table</span>
+<span class="kw">for</span> cle, valeur <span class="kw">in</span> <span class="fn">pairs</span>(joueur) <span class="kw">do</span>
+    <span class="fn">print</span>(cle .. <span class="str">" = "</span> .. <span class="fn">tostring</span>(valeur))
+<span class="kw">end</span></div>
+<div class="note">ℹ️ En Lua, les indices de tableau commencent à <strong>1</strong>, pas 0 comme dans la plupart des langages !</div>`
+      }
+    ]
+  },
+};
+
+// ── QUIZ QUESTIONS BANK ─────────────────────────────────────
+// Large bank per unit — randomized each session
+const QB = {
+  'py-var':[
+    {p:'📦 Python · Variables',q:'Quel type stocke un nombre décimal ?',t:'mcq',o:['float','int','str','bool'],c:0,e:'float stocke les décimaux : 3.14, -0.5, 2.0…'},
+    {p:'📦 Python · Variables',q:'Comment afficher "Bonjour" en Python ?',t:'mcq',o:['print("Bonjour")','echo "Bonjour"','console.log("Bonjour")','write("Bonjour")'],c:0,e:'print() est la fonction d\'affichage standard en Python.'},
+    {p:'📦 Python · Variables',q:'Quelle fonction retourne le type d\'une variable ?',t:'mcq',o:['type(x)','typeof x','x.type()','gettype(x)'],c:0,e:'type(42) renvoie <class \'int\'>.'},
+    {p:'📦 Python · Variables',q:'Quel opérateur concatène deux strings ?',t:'mcq',o:['+','*','&','..'],c:0,e:'"Hello" + " World" → "Hello World"'},
+    {p:'📦 Python · Variables',q:'Comment convertir la string "42" en entier ?',t:'mcq',o:['int("42")','integer("42")','(int)"42"','convert("42",int)'],c:0,e:'int() convertit une chaîne numérique en entier.'},
+    {p:'📦 Python · Variables',q:'Quelle est la valeur de type(3.14) ?',t:'mcq',o:["<class 'float'>",'float',"<class 'int'>",'number'],c:0,e:'3.14 est un float, type() retourne <class \'float\'>.'},
+    {p:'📦 Python · Variables',q:'Complétez : variable age valant 25',t:'fill',code:`<span class="op">___</span> = <span class="num">25</span>`,b:'age',e:'En Python : nom_variable = valeur. Simple !'},
+    {p:'📦 Python · f-strings',q:'Comment insérer une variable dans un f-string ?',t:'mcq',o:['f"Bonjour {nom}"','f"Bonjour $nom"','f"Bonjour %nom%"','f"Bonjour [nom]"'],c:0,e:'Dans un f-string, les variables sont entre accolades {variable}.'},
+    {p:'📦 Python · Variables',q:'Quelle valeur Python représente "vrai" ?',t:'mcq',o:['True','true','TRUE','1 (uniquement)'],c:0,e:'En Python, le booléen s\'écrit True avec un T majuscule.'},
+    {p:'📦 Python · Variables',q:'Que retourne int(3.9) ?',t:'mcq',o:['3','4','3.9','Error'],c:0,e:'int() tronque vers zéro : int(3.9) = 3, int(-3.9) = -3.'},
+  ],
+  'py-loop':[
+    {p:'🔁 Python · Boucles',q:'Que produit range(3) ?',t:'mcq',o:['0, 1, 2','1, 2, 3','0, 1, 2, 3','1, 2'],c:0,e:'range(3) génère 0, 1, 2 — il ne va pas jusqu\'à 3.'},
+    {p:'🔁 Python · Boucles',q:'Quel mot-clé quitte une boucle immédiatement ?',t:'mcq',o:['break','stop','exit','return'],c:0,e:'break sort de la boucle en cours.'},
+    {p:'🔁 Python · Boucles',q:'Que fait continue dans une boucle ?',t:'mcq',o:['Saute l\'itération courante','Arrête la boucle','Recommence depuis le début','Ne fait rien'],c:0,e:'continue passe directement à l\'itération suivante.'},
+    {p:'🔁 Python · Boucles',q:'Complétez range() pour commencer à 1 :',t:'fill',code:`<span class="kw">for</span> i <span class="kw">in</span> <span class="fn">range</span>(<span class="op">___</span>, <span class="num">6</span>):\n    <span class="fn">print</span>(i)`,b:'1',e:'range(1, 6) génère 1, 2, 3, 4, 5.'},
+    {p:'🔁 Python · Boucles',q:'Quelle boucle s\'exécute tant qu\'une condition est vraie ?',t:'mcq',o:['while','for','loop','repeat'],c:0,e:'while condition: ... continue tant que la condition est True.'},
+    {p:'🔁 Python · Boucles',q:'Sortie de : for i in range(2, 8, 2): print(i) ?',t:'mcq',o:['2 4 6','2 4 6 8','0 2 4 6','2 3 4 5 6 7'],c:0,e:'range(2, 8, 2) = 2, 4, 6 (pas jusqu\'à 8, step de 2).'},
+    {p:'🔁 Python · Boucles',q:'Comment obtenir index ET valeur dans une boucle for ?',t:'mcq',o:['enumerate(liste)','index(liste)','range(liste)','zip(liste)'],c:0,e:'enumerate(liste) retourne des tuples (index, valeur).'},
+    {p:'🔁 Python · Boucles',q:'Quelle boucle est préférable si le nombre d\'itérations est connu ?',t:'mcq',o:['for','while','do-while','loop'],c:0,e:'for est idéal quand on connaît à l\'avance le nombre d\'itérations.'},
+  ],
+  'jv-base':[
+    {p:'☕ Java · Bases',q:'Comment afficher du texte en Java ?',t:'mcq',o:['System.out.println("texte");','print("texte");','echo "texte";','console.log("texte");'],c:0,e:'System.out.println() affiche et saute une ligne.'},
+    {p:'☕ Java · Types',q:'Type Java pour un entier standard ?',t:'mcq',o:['int','integer','number','whole'],c:0,e:'int est le type primitif entier de base en Java.'},
+    {p:'☕ Java · Types',q:'Différence entre int et Integer ?',t:'mcq',o:['int est primitif, Integer est un objet','C\'est pareil','Integer est plus rapide','int est une classe'],c:0,e:'int = type primitif. Integer = objet wrapper avec méthodes.'},
+    {p:'☕ Java · Bases',q:'Comment déclarer une constante en Java ?',t:'mcq',o:['final int MAX = 100;','const int MAX = 100;','static int MAX = 100;','readonly int MAX = 100;'],c:0,e:'final empêche la réassignation — c\'est une constante.'},
+    {p:'☕ Java · Bases',q:'Que fait System.out.printf("%d + %d = %d", 2, 3, 5) ?',t:'mcq',o:['Affiche "2 + 3 = 5"','Affiche "%d + %d = %d"','Erreur de compilation','Affiche "2.0 + 3.0 = 5.0"'],c:0,e:'printf formate le texte : %d = entier, %s = string, %f = décimal.'},
+    {p:'☕ Java · Types',q:'Type pour stocker un seul caractère en Java ?',t:'mcq',o:['char','character','String','letter'],c:0,e:'char stocke un seul caractère entre apostrophes : \'A\'.'},
+    {p:'☕ Java · Bases',q:'Que se passe-t-il si le fichier s\'appelle Main.java mais la classe Hello ?',t:'mcq',o:['Erreur de compilation','Ça fonctionne','Warning uniquement','La classe est renommée'],c:0,e:'Le nom du fichier .java doit correspondre exactement au nom de la classe publique.'},
+  ],
+  'lx-term':[
+    {p:'💻 Linux · Terminal',q:'Lister les fichiers avec permissions et taille ?',t:'mcq',o:['ls -lh','ls','dir','list -details'],c:0,e:'ls -lh : l=format long, h=taille lisible (Ko, Mo, Go).'},
+    {p:'💻 Linux · Terminal',q:'Afficher le répertoire courant ?',t:'mcq',o:['pwd','ls','cd','path'],c:0,e:'pwd (print working directory) affiche le chemin absolu.'},
+    {p:'💻 Linux · Terminal',q:'Créer un dossier projet/src/utils en une commande ?',t:'mcq',o:['mkdir -p projet/src/utils','mkdir projet/src/utils','md projet\\src\\utils','makedir projet/src/utils'],c:0,e:'mkdir -p crée aussi les dossiers parents manquants.'},
+    {p:'💻 Linux · Terminal',q:'Copier un dossier entier ?',t:'mcq',o:['cp -r source/ dest/','cp source/ dest/','copy source/ dest/','cp -f source/ dest/'],c:0,e:'cp -r (recursive) copie un dossier et tout son contenu.'},
+    {p:'💻 Linux · Terminal',q:'Afficher les 10 dernières lignes d\'un fichier ?',t:'mcq',o:['tail -n 10 fichier','head -n 10 fichier','last 10 fichier','cat -10 fichier'],c:0,e:'tail affiche la fin du fichier. head affiche le début.'},
+    {p:'💻 Linux · Terminal',q:'Chercher "erreur" dans un fichier log ?',t:'mcq',o:['grep "erreur" app.log','find "erreur" app.log','search "erreur" app.log','cat app.log | find "erreur"'],c:0,e:'grep cherche un motif dans un fichier ou une entrée.'},
+    {p:'💻 Linux · Terminal',q:'Complétez pour créer un fichier vide :',t:'fill',code:`<span class="op">___</span> readme.txt`,b:'touch',e:'touch crée un fichier vide ou met à jour sa date.'},
+    {p:'💻 Linux · Terminal',q:'Revenir au répertoire home ?',t:'mcq',o:['cd ~','cd ..','cd /home','cd back'],c:0,e:'cd ~ va directement dans votre répertoire home (/home/user).'},
+  ],
+  'mc-env':[
+    {p:'⛏️ Minecraft · Setup',q:'Quel langage pour les mods Forge ?',t:'mcq',o:['Java','Python','C++','Lua'],c:0,e:'Minecraft est en Java, donc les mods Forge aussi.'},
+    {p:'⛏️ Minecraft · Setup',q:'Que signifie MDK ?',t:'mcq',o:['Mod Development Kit','Minecraft Dev Kit','Module Development Key','Main Deployment Kit'],c:0,e:'MDK = Mod Development Kit — le kit de base fourni par Forge.'},
+    {p:'⛏️ Minecraft · Setup',q:'Java requis pour Minecraft 1.20+ ?',t:'mcq',o:['Java 17','Java 8','Java 11','Java 21'],c:0,e:'Minecraft 1.17+ requiert Java 17 LTS.'},
+    {p:'⛏️ Minecraft · Setup',q:'Quelle annotation déclare une classe comme mod Forge ?',t:'mcq',o:['@Mod("monmod")','@Plugin','@ForgeMod','@MinecraftMod'],c:0,e:'@Mod("modid") est l\'annotation fondamentale de tout mod Forge.'},
+    {p:'⛏️ Minecraft · Setup',q:'Fichier de métadonnées d\'un mod Forge ?',t:'fill',code:`src/main/resources/META-INF/<span class="op">___</span>.toml`,b:'mods',e:'mods.toml contient les métadonnées : nom, version, dépendances.'},
+    {p:'⛏️ Forge vs Fabric',q:'Avantage principal de Fabric vs Forge ?',t:'mcq',o:['Plus léger et mises à jour plus rapides','Plus de mods disponibles','Meilleure documentation','Existe depuis plus longtemps'],c:0,e:'Fabric est plus léger et se met à jour rapidement après chaque version MC.'},
+  ],
+  'wo-lua':[
+    {p:'📜 Lua · Bases',q:'Mot-clé pour une variable locale en Lua ?',t:'mcq',o:['local','var','let','dim'],c:0,e:'local x = 5 crée une variable locale. Sans local, elle est globale.'},
+    {p:'📜 Lua · Bases',q:'Opérateur de concaténation en Lua ?',t:'mcq',o:['..','+',' &','*'],c:0,e:'"Hello" .. " World" = "Hello World" en Lua.'},
+    {p:'📜 Lua · Tables',q:'Premier index d\'un tableau Lua ?',t:'mcq',o:['1','0','-1','nil'],c:0,e:'Contrairement à la plupart des langages, Lua commence les indices à 1 !'},
+    {p:'📜 Lua · Fonctions',q:'Syntaxe correcte pour une fonction Lua ?',t:'mcq',o:['function nom() ... end','def nom(): ...','void nom() {}','function nom() {}'],c:0,e:'Lua utilise function ... end pour délimiter les blocs.'},
+    {p:'📜 Lua · Commentaires',q:'Comment commenter en Lua ?',t:'mcq',o:['-- commentaire','// commentaire','# commentaire','/* commentaire */'],c:0,e:'-- pour une ligne. --[[ ... ]] pour multi-lignes.'},
+    {p:'📜 Lua · Tables',q:'Parcourir toutes les paires clé/valeur d\'une table Lua ?',t:'mcq',o:['for k,v in pairs(t) do','for k,v in t do','foreach k,v in t','for(k in t)'],c:0,e:'pairs() retourne clé et valeur pour chaque entrée de la table.'},
+    {p:'📜 Lua · Bases',q:'Valeur représentant "rien" en Lua ?',t:'mcq',o:['nil','null','undefined','void'],c:0,e:'nil est la valeur Lua pour l\'absence de donnée.'},
+  ],
+  'daily':[
+    {p:'⚡ Défi du Jour',q:'En Python, = vs == ?',t:'mcq',o:['= assigne, == compare','== assigne, = compare','Les deux comparent','Les deux assignent'],c:0,e:'= est l\'assignation. == est la comparaison (retourne True/False).'},
+    {p:'⚡ Défi du Jour',q:'En Java, annotation principale d\'un mod Forge ?',t:'mcq',o:['@Mod','@Plugin','@ForgeMod','@MinecraftMod'],c:0,e:'@Mod("modid") déclare la classe principale comme un mod Forge.'},
+    {p:'⚡ Défi du Jour',q:'En Lua WoW, commentaire sur une ligne ?',t:'mcq',o:['--','//','#','/*'],c:0,e:'-- commence un commentaire en Lua.'},
+    {p:'⚡ Défi du Jour',q:'Commande Ubuntu pour tout mettre à jour ?',t:'mcq',o:['sudo apt upgrade','sudo apt update','sudo apt install --all','sudo apt refresh'],c:0,e:'apt update rafraîchit la liste. apt upgrade installe les mises à jour.'},
+    {p:'⚡ Défi du Jour',q:'Dans un datapack Minecraft, @p désigne ?',t:'mcq',o:['Joueur le plus proche','Tous les joueurs','Joueur aléatoire','Soi-même'],c:0,e:'@p = plus proche, @a = tous, @r = aléatoire, @s = soi-même.'},
+    {p:'⚡ Défi du Jour',q:'En Java, quel opérateur teste l\'égalité d\'objets par contenu ?',t:'mcq',o:['.equals()','==','===','is'],c:0,e:'== compare les références. .equals() compare le contenu des objets.'},
+  ],
+};
+const FALLBACK_Q=[
+  {p:'💡 Général',q:'Qu\'est-ce qu\'une variable ?',t:'mcq',o:['Espace mémoire nommé','Un fichier','Un opérateur','Un type'],c:0,e:'Une variable stocke une valeur en mémoire sous un nom.'},
+  {p:'💡 Général',q:'Qu\'est-ce qu\'une fonction ?',t:'mcq',o:['Bloc de code réutilisable','Un type','Un opérateur','Un fichier'],c:0,e:'Une fonction est un bloc nommé et réutilisable.'},
+  {p:'💡 Général',q:'Que signifie IDE ?',t:'mcq',o:['Integrated Development Environment','Internet Dev Engine','Indexed Data Entry','Interactive Debug Editor'],c:0,e:'IDE = Environnement de Développement Intégré (éditeur + outils).'},
+];
+
+// ── SANDBOX EXERCISES ──────────────────────────────────────
+const SANDBOX = {
+  'py-var':{
+    lang:'Python (simulé)',
+    exercises:[
+      {label:'Ex 1 – Ma fiche',code:`# Créez 4 variables et affichez-les avec un f-string
+prenom = "Votre prénom"
+age = 0
+ville = "Votre ville"
+hobby = "Votre hobby"
+
+print(f"Je m'appelle {prenom}, j'ai {age} ans.")
+print(f"J'habite à {ville} et j'aime {hobby}.")`},
+      {label:'Ex 2 – Calcul IMC',code:`# Calculez l'IMC (poids / taille²)
+poids = 70      # kg
+taille = 1.75   # mètres
+
+imc = poids / (taille ** 2)
+print(f"IMC: {imc:.1f}")
+
+if imc < 18.5:
+    print("Insuffisance pondérale")
+elif imc < 25:
+    print("Poids normal")`},
+      {label:'Ex 3 – Conversion',code:`# Convertissez des euros en dollars et en livres sterling
+euros = 100
+taux_dollar = 1.08
+taux_livre = 0.86
+
+dollars = euros * taux_dollar
+livres = euros * taux_livre
+
+print(f"{euros}€ = ${dollars:.2f} = £{livres:.2f}")`},
+    ]
+  },
+  'py-loop':{
+    lang:'Python (simulé)',
+    exercises:[
+      {label:'Ex 1 – Table de multiplication',code:`# Affichez la table de multiplication de 7
+for i in range(1, 11):
+    resultat = 7 * i
+    print(f"7 x {i} = {resultat}")`},
+      {label:'Ex 2 – Compte à rebours',code:`# Compte à rebours de 10 à 0
+compteur = 10
+while compteur >= 0:
+    if compteur == 0:
+        print("DÉCOLLAGE ! 🚀")
+    else:
+        print(compteur)
+    compteur -= 1`},
+      {label:'Ex 3 – Nombres pairs',code:`# Affichez tous les nombres pairs de 0 à 20
+for i in range(0, 21):
+    if i % 2 == 0:
+        print(i, end=" ")
+print()  # Nouvelle ligne à la fin`},
+    ]
+  },
+  'lx-term':{
+    lang:'Bash (simulé)',
+    exercises:[
+      {label:'Ex 1 – Navigation',code:`# Ces commandes s'exécutent en vrai dans votre terminal !
+# Essayez-les une par une :
+
+pwd
+ls -la
+cd ~
+mkdir test_codequest
+cd test_codequest
+touch fichier1.txt fichier2.txt
+ls`},
+      {label:'Ex 2 – Fichiers',code:`# Manipulation de fichiers :
+echo "Bonjour Linux" > bonjour.txt
+cat bonjour.txt
+cp bonjour.txt copie.txt
+ls -lh
+rm copie.txt
+ls`},
+    ]
+  },
+};
+
+// ── ACHIEVEMENTS ───────────────────────────────────────────
+const ACHIEVEMENTS=[
+  {ico:'🔥',nm:'7 jours de suite',ds:'Série de 7 jours',cond:u=>u.streak>=7},
+  {ico:'⚡',nm:'1 000 XP',ds:'Atteignez 1000 XP',cond:u=>u.xp>=1000},
+  {ico:'📖',nm:'Premier Cours',ds:'Lisez un cours complet',cond:u=>(u.readChapters||[]).length>0},
+  {ico:'🎓',nm:'Diplômé',ds:'Terminez 5 leçons',cond:u=>(u.done||[]).length>=5},
+  {ico:'🐍',nm:'Pythoniste',ds:'Terminez Python Variables',cond:u=>(u.done||[]).includes('py-var')},
+  {ico:'⛏️',nm:'Creeper Coder',ds:'Terminez Minecraft Setup',cond:u=>(u.done||[]).includes('mc-env')},
+  {ico:'🧙',nm:'Warlock Dev',ds:'Terminez Lua WoW',cond:u=>(u.done||[]).includes('wo-lua')},
+  {ico:'💻',nm:'Terminal Pro',ds:'Terminez Linux Terminal',cond:u=>(u.done||[]).includes('lx-term')},
+  {ico:'🎯',nm:'Perfect Run',ds:'100% sur un quiz',cond:u=>(u.perfectRuns||0)>=1},
+  {ico:'☁️',nm:'Cloud Saver',ds:'Connecté via Firebase',cond:_=>true},
+];
+
+const MOCK_LB=[
+  {name:'AlexCode',ava:'👨‍💻',xp:12450,streak:21,lvl:25},
+  {name:'SarahDev',ava:'👩‍💻',xp:10320,streak:14,lvl:21},
+  {name:'MarcLinux',ava:'🧑‍💻',xp:9180,streak:8,lvl:19},
+  {name:'PierreWoW',ava:'🧙',xp:7200,streak:5,lvl:15},
+];
+
+// ═══════════════════════════════════════════════════════════
+//  APP STATE
+// ═══════════════════════════════════════════════════════════
+let ST = {
+  unit: null, course: null,
+  // Theory
+  chIdx: 0, chapters: [],
+  // Quiz
+  qs:[], qIdx:0, correct:0, start:null, answered:false, quizUnitId:null,
+  // Sandbox
+  sbExercises:[], sbIdx:0,
+};
+
+// ═══════════════════════════════════════════════════════════
+//  AUTH UI
+// ═══════════════════════════════════════════════════════════
+function initAuthUI(){
+  const ag=document.getElementById('ava-grid');
+  ag.innerHTML=AVATARS.map((a,i)=>`<div class="ava-o ${i===0?'sel':''}" onclick="selAvaFn(this,'${a}')">${a}</div>`).join('');
+}
+function selAvaFn(el,a){document.querySelectorAll('.ava-o').forEach(e=>e.classList.remove('sel'));el.classList.add('sel');selAva=a;}
+function switchTab(t){
+  document.querySelectorAll('.a-tab').forEach(e=>e.classList.remove('active'));
+  event.target.classList.add('active');
+  document.getElementById('tab-login').style.display=t==='login'?'block':'none';
+  document.getElementById('tab-register').style.display=t==='register'?'block':'none';
+  clearMsg();
+}
+function showMsg(txt,type='err'){const m=document.getElementById('a-msg');m.textContent=txt;m.className=`a-msg show ${type}`;}
+function clearMsg(){document.getElementById('a-msg').classList.remove('show');}
+
+async function doLogin(){
+  const email=document.getElementById('l-email').value.trim();
+  const pwd=document.getElementById('l-pwd').value;
+  clearMsg();if(!email||!pwd){showMsg('Remplissez tous les champs.');return;}
+  const btn=document.getElementById('login-btn');btn.disabled=true;btn.textContent='Connexion…';
+  try{
+    const {auth,signInWithEmailAndPassword}=window._fb;
+    await signInWithEmailAndPassword(auth,email,pwd);
+  }catch(e){
+    btn.disabled=false;btn.textContent='Se connecter →';
+    const m={'auth/user-not-found':'Compte introuvable.','auth/wrong-password':'Mot de passe incorrect.','auth/invalid-email':'Email invalide.'};
+    showMsg(m[e.code]||'Erreur de connexion.');
+  }
+}
+async function doRegister(){
+  const name=document.getElementById('r-name').value.trim();
+  const email=document.getElementById('r-email').value.trim();
+  const pwd=document.getElementById('r-pwd').value;
+  clearMsg();if(!name||!email||!pwd){showMsg('Remplissez tous les champs.');return;}
+  if(pwd.length<6){showMsg('Mot de passe : min. 6 caractères.');return;}
+  const btn=document.getElementById('reg-btn');btn.disabled=true;btn.textContent='Création…';
+  try{
+    const {auth,db,createUserWithEmailAndPassword,doc,setDoc,serverTimestamp}=window._fb;
+    const cred=await createUserWithEmailAndPassword(auth,email,pwd);
+    const ud={uid:cred.user.uid,name,email,avatar:selAva,xp:0,level:1,xpPct:0,streak:1,
+      lastDay:new Date().toDateString(),done:[],readChapters:[],totalAnswered:0,totalCorrect:0,perfectRuns:0,createdAt:serverTimestamp()};
+    await setDoc(doc(db,'users',cred.user.uid),ud);
+    window._user=ud;
+  }catch(e){
+    btn.disabled=false;btn.textContent='Créer mon compte 🚀';
+    const m={'auth/email-already-in-use':'Email déjà utilisé.','auth/weak-password':'Mot de passe trop faible.'};
+    showMsg(m[e.code]||'Erreur lors de la création.');
+  }
+}
+async function doLogout(){const {auth,signOut}=window._fb;await signOut(auth);window._user=null;showScreen('auth');}
+
+// ═══════════════════════════════════════════════════════════
+//  APP
+// ═══════════════════════════════════════════════════════════
+function showScreen(n){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById('screen-'+n).classList.add('active');}
+
+async function enterApp(user){
+  checkStreak(user);
+  showScreen('app');
+  refreshTopbar(user);
+  renderCourses(user);
+  renderLB(user);
+  renderProfile(user);
+  showView('home');
+}
+
+async function checkStreak(user){
+  const today=new Date().toDateString();
+  if(user.lastDay===today)return;
+  const yest=new Date(Date.now()-86400000).toDateString();
+  user.streak=user.lastDay===yest?(user.streak||0)+1:1;
+  user.lastDay=today;
+  window._user=user;
+  await saveUser(user);
+}
+
+async function saveUser(user){
+  try{
+    const {db,doc,updateDoc}=window._fb;
+    const{uid,createdAt,...data}=user;
+    await updateDoc(doc(db,'users',uid),data);
+    showToast('☁️ Sauvegardé','cloud');
+  }catch(e){console.warn('Save:',e);}
+}
+
+function refreshTopbar(user){
+  document.getElementById('hero-name').textContent=user.name;
+  document.getElementById('tb-lvl').textContent=user.level||1;
+  document.getElementById('tb-xp').textContent=(user.xp||0).toLocaleString('fr');
+  document.getElementById('tb-str').textContent=user.streak||0;
+  document.getElementById('tb-xpf').style.width=(user.xpPct||0)+'%';
+  document.getElementById('sb-ava').textContent=user.avatar||'🧑';
+}
+
+// ── COURSES ────────────────────────────────────────────────
+function getPct(user,cid){
+  const c=COURSES.find(x=>x.id===cid);if(!c)return 0;
+  const d=(user.done||[]).filter(id=>c.units.some(u=>u.id===id)).length;
+  return Math.round((d/c.units.length)*100);
+}
+function renderCourses(user){
+  document.getElementById('courses-grid').innerHTML=COURSES.map(c=>{
+    const pct=getPct(user,c.id);
+    const d=c.units.filter(u=>(user.done||[]).includes(u.id)).length;
+    return `<div class="cc" style="--cc:${c.color}" onclick="openCourse('${c.id}')">
+      ${c.badge?`<div class="cc-bdg">${c.badge}</div>`:''}
+      <div class="cc-ico">${c.icon}</div>
+      <div class="cc-nm">${c.name}</div>
+      <div class="cc-ds">${c.desc}</div>
+      <div class="cc-pg"><div class="cc-pgf" style="width:${pct}%"></div></div>
+      <div class="cc-mt"><span>${pct}% complété</span><span>${d}/${c.units.length}</span></div>
+    </div>`;
+  }).join('');
+}
+
+function openCourse(id){
+  const user=window._user;
+  const c=COURSES.find(x=>x.id===id);
+  ST.course=c;
+  document.getElementById('lesson-title').textContent=`${c.icon} ${c.name}`;
+  document.getElementById('lesson-sub').textContent=`${getPct(user,id)}% complété · ${c.units.length} leçons`;
+  const done=user.done||[];
+  document.getElementById('units-list').innerHTML=c.units.map((u,i)=>{
+    const isDone=done.includes(u.id);
+    const isLocked=u.locked&&!isDone&&!done.includes(c.units[i-1]?.id||'');
+    const hasTheory=!!THEORY[u.id];
+    const hasSandbox=!!SANDBOX[u.id];
+    return `<div class="unit-row ${isDone?'done':''} ${isLocked?'locked':''}" style="--uc:${c.color}"
+      onclick="${!isLocked?`openUnit('${u.id}')`:`showToast('🔒 Terminez les leçons précédentes !','err')`}">
+      <div class="u-ico">${isDone?'✅':u.icon}</div>
+      <div class="u-txt"><h3>${u.name}</h3><p>${u.desc}</p></div>
+      <div class="u-modes">
+        ${hasTheory?'<span class="u-mode-badge theory">📖 Cours</span>':''}
+        ${hasSandbox?'<span class="u-mode-badge code">💻 Code</span>':''}
+        <span class="u-mode-badge quiz">🎯 Quiz</span>
+      </div>
+      <div class="u-xp">+${u.xp} XP</div>
+      <span style="font-size:1rem">${isLocked?'🔒':isDone?'⭐':'▶️'}</span>
+    </div>`;
+  }).join('');
+  showView('lessons');
+}
+
+function openUnit(id){
+  const user=window._user;
+  const allUnits=COURSES.flatMap(c=>c.units);
+  const u=allUnits.find(x=>x.id===id);
+  ST.unit=u;
+  document.getElementById('unit-title').textContent=`${u.icon} ${u.name}`;
+  document.getElementById('unit-sub').textContent=u.desc;
+  // Quiz lock check
+  const read=user.readChapters||[];
+  const quizUnlocked=read.includes(id)||(user.done||[]).includes(id);
+  const pill=document.getElementById('quiz-lock-pill');
+  const qCard=document.getElementById('quiz-mode-card');
+  if(quizUnlocked){
+    pill.textContent='Disponible !'; pill.style.background='#5eead420'; pill.style.color='var(--a)'; pill.style.borderColor='#5eead440';
+    qCard.style.opacity='1'; qCard.onclick=()=>startQuiz(id);
+  } else {
+    pill.textContent='Lisez le cours d\'abord'; pill.style.background=''; pill.style.color=''; pill.style.borderColor='';
+    qCard.style.opacity='0.5'; qCard.onclick=()=>showToast('📖 Lisez d\'abord le cours théorique !','info');
+  }
+  // Hide sandbox if no content
+  const sbCard=document.querySelector('.mode-card.code-c');
+  sbCard.style.display=SANDBOX[id]?'':'none';
+  showView('unit');
+}
+
+// ── THEORY ─────────────────────────────────────────────────
+function startTheory(){
+  const u=ST.unit;
+  const data=THEORY[u.id];
+  if(!data){showToast('Cours en cours de rédaction… Revenez bientôt !','info');return;}
+  ST.chapters=data.chapters; ST.chIdx=0;
+  renderChapter();
+  showView('theory');
+}
+
+function renderChapter(){
+  const ch=ST.chapters[ST.chIdx];
+  const total=ST.chapters.length;
+  // Dots
+  const dots=document.getElementById('ch-prog-dots');
+  dots.innerHTML=ST.chapters.map((_,i)=>`<div class="ch-dot ${i<ST.chIdx?'done':i===ST.chIdx?'active':''}"></div>`).join('');
+  document.getElementById('ch-prog-label').textContent=`Chapitre ${ST.chIdx+1}/${total}`;
+  // Content
+  const data=THEORY[ST.unit.id];
+  document.getElementById('theory-content').innerHTML=`
+    <div class="theory-card">
+      <div class="ch-badge">📖 ${data.title} · Chapitre ${ST.chIdx+1}/${total}</div>
+      <h2>${ch.title}</h2>
+      ${ch.content}
+    </div>`;
+  // Nav buttons
+  const nav=document.getElementById('theory-nav');
+  const isLast=ST.chIdx===total-1;
+  nav.innerHTML=`
+    ${ST.chIdx>0?`<button class="t-btn prev" onclick="prevChapter()">← Précédent</button>`:'<div></div>'}
+    ${isLast
+      ? `<button class="t-btn finish" onclick="finishTheory()">✅ J'ai compris — Passer au quiz !</button>`
+      : `<button class="t-btn next" onclick="nextChapter()">Suivant → Chapitre ${ST.chIdx+2}</button>`}`;
+}
+
+function nextChapter(){ST.chIdx++;renderChapter();document.querySelector('.content').scrollTo(0,0);}
+function prevChapter(){ST.chIdx--;renderChapter();document.querySelector('.content').scrollTo(0,0);}
+
+async function finishTheory(){
+  const user=window._user;
+  const uid=ST.unit.id;
+  user.readChapters=user.readChapters||[];
+  if(!user.readChapters.includes(uid)){user.readChapters.push(uid);}
+  window._user=user;
+  await saveUser(user);
+  // Show completion screen
+  document.getElementById('theory-content').innerHTML=`
+    <div class="theory-complete">
+      <div class="tc-icon">🎓</div>
+      <div class="tc-title">Cours terminé !</div>
+      <div class="tc-sub">Excellent ! Vous avez lu tous les chapitres de <strong>${ST.unit.name}</strong>.<br>
+        Le quiz est maintenant débloqué. Testez vos connaissances !</div>
+      <div class="tc-btns">
+        <button class="tc-btn quiz-go" onclick="startQuiz('${uid}')">🎯 Lancer le Quiz</button>
+        <button class="tc-btn back-home" onclick="showView('unit')">← Retour à la leçon</button>
+      </div>
+    </div>`;
+  document.getElementById('theory-nav').innerHTML='';
+  document.getElementById('ch-prog-dots').querySelectorAll('.ch-dot').forEach(d=>d.classList.add('done'));
+  showToast('📖 Cours lu ! Quiz débloqué 🎯','info');
+}
+
+// ── SANDBOX ────────────────────────────────────────────────
+function startSandbox(){
+  const u=ST.unit;
+  const sb=SANDBOX[u.id];
+  if(!sb){showToast('Sandbox en préparation… Revenez bientôt !','info');return;}
+  ST.sbExercises=sb.exercises; ST.sbIdx=0;
+  document.getElementById('sandbox-title').textContent=`💻 ${u.name}`;
+  document.getElementById('sb-lang-label').textContent=sb.lang;
+  renderExList();
+  loadExercise(0);
+  showView('sandbox');
+}
+
+function renderExList(){
+  document.getElementById('ex-list').innerHTML=ST.sbExercises.map((ex,i)=>
+    `<button class="ex-btn ${i===0?'active':''}" onclick="loadExercise(${i})">${ex.label}</button>`
+  ).join('');
+}
+
+function loadExercise(i){
+  ST.sbIdx=i;
+  document.querySelectorAll('.ex-btn').forEach((b,j)=>b.classList.toggle('active',j===i));
+  document.getElementById('code-editor').value=ST.sbExercises[i].code;
+  clearOutput();
+}
+
+function runCode(){
+  const code=document.getElementById('code-editor').value;
+  const out=document.getElementById('output-area');
+  out.innerHTML='';
+  const lines=[];
+  // Simple Python/Bash simulator
+  const printMatches=[...code.matchAll(/print\(([^)]+)\)/g)];
+  const echoMatches=[...code.matchAll(/echo\s+"([^"]+)"/g)];
+  if(printMatches.length===0&&echoMatches.length===0){
+    out.innerHTML=`<div class="out-info">Aucun print() ou echo trouvé dans le code.</div>
+      <div class="out-info">Note : l'exécution complète nécessite un vrai environnement Python/Bash.</div>`;
+    return;
+  }
+  printMatches.forEach(m=>{
+    let val=m[1].trim();
+    val=val.replace(/f"([^"]+)"/g,(_,s)=>s.replace(/\{[^}]+\}/g,'<valeur>'));
+    val=val.replace(/^"|"$/g,'').replace(/^'|'$/g,'');
+    lines.push(`<div class="out-line out-ok">→ ${val}</div>`);
+  });
+  echoMatches.forEach(m=>lines.push(`<div class="out-line out-ok">→ ${m[1]}</div>`));
+  if(lines.length)out.innerHTML=lines.join('')+`<div class="out-info" style="margin-top:.5rem">💡 Exécution simulée. Pour de vrais résultats, copiez ce code dans votre éditeur local.</div>`;
+}
+
+function clearOutput(){document.getElementById('output-area').innerHTML=`<span class="out-info">Cliquez ▶ Exécuter pour voir le résultat…</span>`;}
+function resetEditor(){loadExercise(ST.sbIdx);}
+
+function copyCode(btn){
+  const block=btn.closest('.codeblock');
+  const text=block.innerText.replace(/^(Copier|Python|Java|Bash|Lua|TOML|Structure|Setup)\n/,'').replace(/^Copier\n/,'');
+  navigator.clipboard.writeText(text).then(()=>{btn.textContent='✓';btn.classList.add('cp');setTimeout(()=>{btn.textContent='Copier';btn.classList.remove('cp');},1500);});
+}
+
+// ── QUIZ ───────────────────────────────────────────────────
+function startQuiz(unitId){
+  const id=unitId||ST.unit?.id;
+  ST.quizUnitId=id;
+  const bank=[...(QB[id]||FALLBACK_Q)];
+  // Shuffle and pick max 8
+  bank.sort(()=>Math.random()-.5);
+  ST.qs=bank.slice(0,Math.min(8,bank.length));
+  ST.qIdx=0; ST.correct=0; ST.answered=false; ST.start=Date.now();
+  showView('quiz');
+  loadQ();
+}
+
+function loadQ(){
+  const q=ST.qs[ST.qIdx];
+  const pct=Math.round((ST.qIdx/ST.qs.length)*100);
+  document.getElementById('q-prog').style.width=pct+'%';
+  document.getElementById('q-ctr').textContent=`${ST.qIdx+1}/${ST.qs.length}`;
+  document.getElementById('q-pill').textContent=q.p||'Question';
+  document.getElementById('q-txt').textContent=q.q;
+  document.getElementById('q-fb').className='feedback';
+  document.getElementById('skip-btn').style.display='';
+  ST.answered=false;
+  const code=document.getElementById('q-code');
+  q.code?(code.style.display='block',code.innerHTML=q.code):(code.style.display='none');
+  const wrap=document.getElementById('q-opts');
+  const sb=document.getElementById('submit-btn');
+  sb.textContent='Vérifier';sb.className='q-btn primary';sb.disabled=true;sb.onclick=handleSubmit;
+  if(q.t==='mcq'){
+    const keys=['A','B','C','D'];
+    wrap.innerHTML=`<div class="opts">${q.o.map((o,i)=>`
+      <button class="opt" onclick="selOpt(this,${i})" data-i="${i}">
+        <span class="opt-k">${keys[i]}</span>${o}
+      </button>`).join('')}</div>`;
+  }else{
+    wrap.innerHTML=`<input class="fill-inp" id="fill-inp" placeholder="Votre réponse…" autocomplete="off"
+      oninput="document.getElementById('submit-btn').disabled=this.value.trim()===''">`;
+    setTimeout(()=>document.getElementById('fill-inp')?.focus(),50);
+  }
+}
+
+function selOpt(btn,idx){
+  if(ST.answered)return;
+  document.querySelectorAll('.opt').forEach(b=>b.classList.remove('sel'));
+  btn.classList.add('sel');
+  document.getElementById('submit-btn').disabled=false;
+}
+
+function handleSubmit(){
+  if(ST.answered){nextQ();return;}
+  ST.answered=true;
+  const q=ST.qs[ST.qIdx];let ok=false;
+  if(q.t==='mcq'){
+    const sel=document.querySelector('.opt.sel');
+    const idx=parseInt(sel?.dataset.i??'-1');
+    ok=idx===q.c;
+    document.querySelectorAll('.opt').forEach((b,i)=>{
+      b.disabled=true;
+      if(i===q.c)b.classList.add('ok');
+      else if(i===idx&&!ok)b.classList.add('bad');
+    });
+  }else{
+    const inp=document.getElementById('fill-inp');
+    ok=inp?.value.trim().toLowerCase()===q.b?.toLowerCase();
+    if(inp){inp.disabled=true;inp.className='fill-inp '+(ok?'ok':'bad');}
+  }
+  if(ok){ST.correct++;showToast('+10 XP ⚡','xp');}
+  const fb=document.getElementById('q-fb');
+  fb.className=`feedback show ${ok?'ok':'bad'}`;
+  document.getElementById('fb-ico').textContent=ok?'✅':'❌';
+  document.getElementById('fb-title').textContent=ok?'Correct ! ✓':'Pas tout à fait…';
+  document.getElementById('fb-det').textContent=q.e||'';
+  const sb=document.getElementById('submit-btn');
+  sb.textContent=ST.qIdx<ST.qs.length-1?'Continuer →':'Voir les résultats';
+  sb.className='q-btn success';sb.disabled=false;sb.onclick=nextQ;
+  document.getElementById('skip-btn').style.display='none';
+}
+
+function skipQ(){ST.qIdx++;if(ST.qIdx>=ST.qs.length){showResults();return;}loadQ();}
+function nextQ(){ST.qIdx++;if(ST.qIdx>=ST.qs.length){showResults();return;}loadQ();}
+
+async function showResults(){
+  const user=window._user;
+  const elapsed=Math.floor((Date.now()-ST.start)/1000);
+  const total=ST.qs.length;
+  const acc=Math.round((ST.correct/total)*100);
+  const xp=ST.correct*10*(ST.quizUnitId==='daily'?2:1);
+  user.xp=(user.xp||0)+xp;
+  user.totalAnswered=(user.totalAnswered||0)+total;
+  user.totalCorrect=(user.totalCorrect||0)+ST.correct;
+  if(acc===100)user.perfectRuns=(user.perfectRuns||0)+1;
+  if(ST.quizUnitId&&ST.quizUnitId!=='daily'){
+    user.done=user.done||[];
+    if(!user.done.includes(ST.quizUnitId))user.done.push(ST.quizUnitId);
+  }
+  const xpPerLvl=500;
+  user.level=Math.floor(user.xp/xpPerLvl)+1;
+  user.xpPct=((user.xp%xpPerLvl)/xpPerLvl)*100;
+  window._user=user;
+  refreshTopbar(user);renderCourses(user);renderProfile(user);
+  await saveUser(user);
+  const m=Math.floor(elapsed/60),s=elapsed%60;
+  const e=acc>=90?'🏆':acc>=70?'🎉':acc>=50?'👍':'💪';
+  document.getElementById('res-trophy').textContent=e;
+  document.getElementById('res-title').textContent=acc>=90?'Parfait !':acc>=70?'Excellent !':acc>=50?'Bien joué !':'Continue !';
+  document.getElementById('res-sub').textContent=`${ST.correct}/${total} bonnes réponses · Sauvegardé dans le cloud ☁️`;
+  document.getElementById('rv-xp').textContent='+'+xp;
+  document.getElementById('rv-acc').textContent=acc+'%';
+  document.getElementById('rv-time').textContent=`${m}:${s.toString().padStart(2,'0')}`;
+  showView('results');
+}
+
+function replayQuiz(){startQuiz(ST.quizUnitId);}
+function exitQuiz(){ST.unit?showView('unit'):showView('home');}
+
+// ── LEADERBOARD ────────────────────────────────────────────
+function renderLB(user){
+  user=user||window._user;
+  const all=[...(user?[{name:user.name,ava:user.avatar||'🧑',xp:user.xp||0,streak:user.streak||0,lvl:user.level||1,me:true}]:[]),...MOCK_LB].sort((a,b)=>b.xp-a.xp);
+  const medals=['🥇','🥈','🥉'];
+  document.getElementById('lb-rows').innerHTML=all.map((p,i)=>`
+    <div class="lb-r ${p.me?'me':''}">
+      <div class="lb-rank">${medals[i]||i+1}</div>
+      <div class="lb-ava" style="background:${p.me?'#5eead422':'#1a1d2e'}">${p.ava}</div>
+      <div class="lb-inf">
+        <div class="lb-nm">${p.name}${p.me?' <span style="color:var(--a);font-size:.68rem">← Vous</span>':''}</div>
+        <div class="lb-sb">Niveau ${p.lvl||1} · 🔥${p.streak} jours</div>
+      </div>
+      <div class="lb-xp">⚡ ${(p.xp||0).toLocaleString('fr')}</div>
+    </div>`).join('');
+}
+
+// ── PROFILE ────────────────────────────────────────────────
+function renderProfile(user){
+  user=user||window._user;if(!user)return;
+  document.getElementById('p-ava').textContent=user.avatar||'🧑';
+  document.getElementById('p-name').textContent=user.name;
+  document.getElementById('p-email').textContent=user.email;
+  document.getElementById('ps-xp').textContent=(user.xp||0).toLocaleString('fr');
+  document.getElementById('ps-str').textContent='🔥'+(user.streak||0);
+  document.getElementById('ps-les').textContent=(user.done||[]).length;
+  const acc=user.totalAnswered?Math.round((user.totalCorrect/user.totalAnswered)*100):0;
+  document.getElementById('ps-acc').textContent=acc+'%';
+  document.getElementById('ach-grid').innerHTML=ACHIEVEMENTS.map(a=>{
+    const un=a.cond(user);
+    return `<div class="ach-c ${un?'unlocked':''}">
+      <div class="ach-ico">${a.ico}</div><div class="ach-nm">${a.nm}</div><div class="ach-ds">${a.ds}</div>
+      ${un?'<div style="margin-top:.3rem;font-size:.62rem;color:var(--a4);font-weight:800">✓ DÉBLOQUÉ</div>':''}
+    </div>`;
+  }).join('');
+}
+
+// ── NAV ────────────────────────────────────────────────────
+function showView(n){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.querySelectorAll('.nb').forEach(b=>b.classList.remove('active'));
+  document.getElementById('view-'+n)?.classList.add('active');
+  document.getElementById('nb-'+n)?.classList.add('active');
+  if(n==='lb')renderLB();
+  if(n==='profile')renderProfile();
+}
+
+// ── TOAST ──────────────────────────────────────────────────
+let _tt;
+function showToast(msg,cls='xp'){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.className=`toast ${cls} show`;
+  clearTimeout(_tt);_tt=setTimeout(()=>t.classList.remove('show'),2200);
+}
+
+// ── BOOT ───────────────────────────────────────────────────
+initAuthUI();
+</script>
+</body>
+</html>
